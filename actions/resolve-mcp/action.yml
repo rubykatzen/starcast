@@ -1,16 +1,13 @@
 name: 'Starcast Resolve MCP'
 description: 'Builds mcp_config JSON from a list of Smithery server names'
-
 inputs:
   servers:
     description: 'Newline-separated list of Smithery server names (e.g. node2flow/telegram-bot)'
     required: true
-
 outputs:
   mcp_config:
     description: 'MCP config JSON ready to pass to claude-code-action'
     value: ${{ steps.resolve.outputs.mcp_config }}
-
 runs:
   using: composite
   steps:
@@ -21,9 +18,7 @@ runs:
         SERVERS: ${{ inputs.servers }}
       run: |
         MCP_CONFIG=$(python3 "$GITHUB_ACTION_PATH/resolve.py")
-
         echo "MCP config: $MCP_CONFIG"
-
         if [ -n "$MCP_CONFIG" ]; then
           echo "mcp_config<<EOF" >> $GITHUB_OUTPUT
           echo "$MCP_CONFIG"     >> $GITHUB_OUTPUT

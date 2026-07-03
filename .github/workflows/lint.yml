@@ -1,0 +1,10 @@
+name: Lint
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+jobs:
+  lint:
+    uses: rubykatzen/baseline/.github/workflows/lint-shared.yml@v0.7
+    with:
+      linters: pymarkdown, yamllint, ruff, actionlint, pre-commit

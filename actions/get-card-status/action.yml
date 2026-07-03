@@ -1,6 +1,5 @@
 name: 'Starcast Get Card Status'
 description: 'Returns the current project status of a card and the ordered list of status options'
-
 inputs:
   issue_node_id:
     description: 'Issue node ID (github.event.issue.node_id)'
@@ -8,7 +7,6 @@ inputs:
   github_token:
     description: 'GitHub token with project read access'
     required: true
-
 outputs:
   status:
     description: 'Current card status'
@@ -19,7 +17,6 @@ outputs:
   project_id:
     description: 'GitHub Project V2 node ID'
     value: ${{ steps.get.outputs.project_id }}
-
 runs:
   using: composite
   steps:
@@ -32,7 +29,6 @@ runs:
         ISSUE_ID="${{ inputs.issue_node_id }}"
         ORG="${{ github.repository_owner }}"
         REPO="${{ github.event.repository.name }}"
-
         # Find project by name matching the repository name
         PROJECT_ID=$(gh api graphql -f query='
           query($org: String!, $name: String!) {
@@ -44,14 +40,11 @@ runs:
           }' -f org="$ORG" -f name="$REPO" \
           --jq '.data.organization.projectsV2.nodes[]' \
           | jq -r --arg repo "$REPO" 'select(.title == $repo) | .id')
-
         if [ -z "$PROJECT_ID" ]; then
           echo "No project found with name '$REPO' in org '$ORG'."
           exit 1
         fi
-
         echo "Project ID: $PROJECT_ID"
-
         # Get current card status
         STATUS=$(gh api graphql -f query='
           query($id: ID!) {
@@ -67,9 +60,7 @@ runs:
               }
             }
           }' -f id="$ISSUE_ID" --jq '.data.node.projectItems.nodes[0].fieldValueByName.name // ""')
-
         echo "Status: $STATUS"
-
         # Get ordered list of status options from the board
         STATUS_OPTIONS=$(gh api graphql -f query='
           query($pid: ID!) {
@@ -83,9 +74,7 @@ runs:
               }
             }
           }' -f pid="$PROJECT_ID" --jq '[.data.node.field.options[].name]')
-
         echo "Status options: $STATUS_OPTIONS"
-
         echo "project_id=$PROJECT_ID"   >> $GITHUB_OUTPUT
         echo "status=$STATUS"           >> $GITHUB_OUTPUT
         echo "status_options=$STATUS_OPTIONS" >> $GITHUB_OUTPUT
