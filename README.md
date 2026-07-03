@@ -6,7 +6,7 @@ Each project defines its own roles and playbooks. The framework provides the run
 
 ## Structure
 
-```
+```text
 actions/run-agent/   ← composite action: assembles system prompt and runs the agent
 ```
 

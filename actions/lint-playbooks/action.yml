@@ -1,11 +1,9 @@
 name: 'Starcast Lint Playbooks'
 description: 'Checks that all playbooks have a role: field in frontmatter'
-
 runs:
   using: composite
   steps:
     - uses: actions/checkout@v4
-
     - name: Check role field in all playbooks
       shell: bash
       run: |
@@ -19,7 +17,6 @@ runs:
             echo "OK: $file (role: $ROLE)"
           fi
         done
-
         if [ $ERRORS -gt 0 ]; then
           echo ""
           echo "$ERRORS playbook(s) failed lint."

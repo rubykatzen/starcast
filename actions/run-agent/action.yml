@@ -1,6 +1,5 @@
 name: 'Starcast Run Agent'
 description: 'Resolves playbook, assembles system prompt, and runs the agent on a card'
-
 inputs:
   issue_number:
     description: 'Card number (GitHub Issue) to work on'
@@ -23,7 +22,6 @@ inputs:
     description: 'Claude model to use (e.g. claude-sonnet-4-6)'
     required: false
     default: 'claude-sonnet-4-6'
-
 runs:
   using: composite
   steps:
@@ -31,7 +29,6 @@ runs:
       uses: actions/checkout@v4
       with:
         path: _production
-
     - name: Resolve playbook
       id: resolve
       uses: dupmachine/starcast/actions/resolve-playbook@main
@@ -40,54 +37,44 @@ runs:
         github_token: ${{ inputs.github_token }}
         playbooks_path: _production/playbooks
         error_label: ${{ inputs.error_label }}
-
     - name: Resolve MCP
       id: mcp
       if: steps.resolve.outputs.role != '' && steps.resolve.outputs.smithery_servers != ''
       uses: dupmachine/starcast/actions/resolve-mcp@main
       with:
         servers: ${{ steps.resolve.outputs.smithery_servers }}
-
     - name: Checkout framework
       if: steps.resolve.outputs.role != ''
       uses: actions/checkout@v4
       with:
         repository: dupmachine/starcast
         path: _starcast
-
     - name: Assemble system prompt
       if: steps.resolve.outputs.role != ''
       shell: bash
       run: |
         ROLE="${{ steps.resolve.outputs.role }}"
         PLAYBOOK="${{ steps.resolve.outputs.playbook }}"
-
         echo "Assembling system prompt for role=$ROLE playbook=$PLAYBOOK"
-
         FRAMEWORK_CLAUDE=_starcast/CLAUDE.md
         PROJECT_CLAUDE=_production/CLAUDE.md
         ROLE_FILE=_production/roles/$ROLE.md
         PLAYBOOK_FILE=_production/playbooks/$PLAYBOOK.md
-
         for f in "$FRAMEWORK_CLAUDE" "$PROJECT_CLAUDE" "$ROLE_FILE" "$PLAYBOOK_FILE"; do
           if [ ! -f "$f" ]; then
             echo "ERROR: required file not found: $f"
             exit 1
           fi
         done
-
         cat "$FRAMEWORK_CLAUDE" \
             "$PROJECT_CLAUDE" \
             "$ROLE_FILE" \
             "$PLAYBOOK_FILE" \
             > CLAUDE.md
-
         echo "System prompt assembled ($(wc -l < CLAUDE.md) lines)"
-
         echo "::group::System prompt (CLAUDE.md)"
         cat CLAUDE.md
         echo "::endgroup::"
-
     - name: Run agent
       if: steps.resolve.outputs.role != ''
       uses: anthropics/claude-code-action@v1
