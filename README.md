@@ -63,7 +63,11 @@ jobs:
   missed webhook deliveries or failed runs. Callers drive this from their own
   `on: schedule` (a `schedule` trigger only fires for the repository that
   owns the workflow file, so it cannot live inside a reusable workflow) plus
-  `workflow_dispatch` for manual runs.
+  `workflow_dispatch` for manual runs. There's no built-in default interval —
+  measured GraphQL cost is a few points per run (well under the 5,000/hour
+  budget), so the choice isn't about load; it's about how much staleness
+  before recovery is acceptable. `rubykatzen/starcast` itself runs every 2
+  hours (`0 */2 * * *`) as a reasonable starting point.
 - **Idempotent, including archived items**: an issue already linked to the
   target project — whether its Project item is archived or not — is left
   untouched. It is never unarchived, never re-added, and this is never an
