@@ -1,0 +1,17 @@
+name: 'Intake Issue: Clarification'
+on:
+  issues:
+    types: [opened]
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+jobs:
+  intake:
+    uses: ./.github/workflows/intake-issue-shared.yml
+    with:
+      project_owner: dupmachine
+      project_number: 4
+      initial_status: Incoming
+      issue_number: ${{ github.event_name == 'issues' && github.event.issue.number || '' }}
+    secrets:
+      github_token: ${{ secrets.CLARIFICATION_TOKEN }}

@@ -1,0 +1,54 @@
+name: Intake Issue
+on:
+  workflow_call:
+    inputs:
+      project_owner:
+        description: 'Org login that owns the target Project (e.g. dupmachine)'
+        required: true
+        type: string
+      project_number:
+        description: 'Numeric Project V2 number'
+        required: true
+        type: number
+      initial_status:
+        description: 'Status option to set on newly added items (e.g. Incoming)'
+        required: true
+        type: string
+      status_field:
+        description: 'Name of the single-select Status field'
+        required: false
+        type: string
+        default: 'Status'
+      issue_number:
+        description: 'Process only this issue (event-driven intake). Omit to reconcile every open issue in the calling repository.'
+        required: false
+        type: string
+        default: ''
+      issue_types:
+        description: 'Comma-separated allow-list of native GitHub Issue Types (e.g. "Task,Bug"). Omit to accept every type.'
+        required: false
+        type: string
+    secrets:
+      github_token:
+        description: 'Token with write access to the calling repository and to Projects owned by project_owner'
+        required: true
+jobs:
+  intake:
+    runs-on: ubuntu-latest
+    steps:
+      # TODO: pin to a floating major tag (@v0, matching baseline/releaser's
+      # own convention) once a release exists that includes this action.
+      # Pinning now would break self-consumption immediately after merge,
+      # since @v0 currently resolves to the pre-this-PR release, which
+      # predates actions/intake-issue entirely. Until then, external
+      # consumers pinning intake-issue-shared.yml@vX still get whatever is
+      # on @main here, which is a known gap in the version-pinning contract.
+      - uses: rubykatzen/starcast/actions/intake-issue@main
+        with:
+          project_owner: ${{ inputs.project_owner }}
+          project_number: ${{ inputs.project_number }}
+          status_field: ${{ inputs.status_field }}
+          initial_status: ${{ inputs.initial_status }}
+          issue_number: ${{ inputs.issue_number }}
+          issue_types: ${{ inputs.issue_types }}
+          github_token: ${{ secrets.github_token }}

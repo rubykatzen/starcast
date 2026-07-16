@@ -32,9 +32,56 @@ The repository is being rebuilt around this model. The previous autonomous
 editorial pipeline implementation has been removed and is not supported. Its
 history remains available in Git.
 
-The first planned reusable workflow will place newly opened issues into a
-cross-repository clarification process. No reusable workflow is published by
-the reboot yet.
+The first published reusable workflow, `intake-issue-shared.yml`, places issues into
+a Project and sets an initial Status — the entry point for the
+cross-repository clarification process.
+
+## Reusable workflows
+
+### `intake-issue-shared.yml`
+
+Adds issues to a GitHub Project V2 and sets a Status field, idempotently.
+
+```yaml
+jobs:
+  intake:
+    uses: rubykatzen/starcast/.github/workflows/intake-issue-shared.yml@v1
+    with:
+      project_owner: my-org
+      project_number: 4
+      initial_status: Incoming
+      issue_number: ${{ github.event.issue.number }}  # omit to reconcile every open issue
+      issue_types: Task,Bug                            # omit to accept every type
+    secrets:
+      github_token: ${{ secrets.PROJECT_TOKEN }}
+```
+
+- **Event-driven intake**: pass `issue_number` from an `issues: opened`
+  caller to add exactly that issue.
+- **Reconcile sweep**: omit `issue_number` to scan every open issue in the
+  calling repository and add whichever are missing — a recovery path for
+  missed webhook deliveries or failed runs. Callers drive this from their own
+  `on: schedule` (a `schedule` trigger only fires for the repository that
+  owns the workflow file, so it cannot live inside a reusable workflow) plus
+  `workflow_dispatch` for manual runs. There's no built-in default interval —
+  measured GraphQL cost is a few points per run (well under the 5,000/hour
+  budget), so the choice isn't about load; it's about how much staleness
+  before recovery is acceptable. `rubykatzen/starcast` itself runs every 2
+  hours (`0 */2 * * *`) as a reasonable starting point.
+- **Idempotent, including archived items**: an issue already linked to the
+  target project — whether its Project item is archived or not — is left
+  untouched. It is never unarchived, never re-added, and this is never an
+  error.
+- **Type filtering**: `issue_types` matches against GitHub's native Issue
+  Type field (`issue.issueType.name`), not labels.
+- `github_token` needs write access to the calling repository's issues and
+  to Projects owned by `project_owner`; StarCast stores no consumer secrets.
+
+This repository is itself a consumer: `intake-issue-clarification.yml` routes issues
+opened in `rubykatzen/starcast` into the shared `dupmachine/Clarification`
+Project, combining event-driven intake and the scheduled reconcile sweep in
+one caller (one `with:` block, so config and future filters only need to be
+set in one place instead of kept in sync across two files).
 
 ## Workflow API
 
