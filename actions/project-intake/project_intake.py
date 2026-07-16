@@ -218,7 +218,7 @@ def main() -> None:
         added.append(issue["number"])
 
     summary = (
-        f"### project-sync: {repo_owner}/{repo_name} -> {project_owner}/#{project_number}\n\n"
+        f"### project-intake: {repo_owner}/{repo_name} -> {project_owner}/#{project_number}\n\n"
         f"- Added ({initial_status}): {added or 'none'}\n"
         f"- Already present (untouched, incl. archived): {skipped_present or 'none'}\n"
         f"- Skipped (issue type filter): {skipped_type or 'none'}\n"

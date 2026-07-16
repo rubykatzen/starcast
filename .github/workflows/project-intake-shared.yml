@@ -1,4 +1,4 @@
-name: Project Sync
+name: Project Intake
 on:
   workflow_call:
     inputs:
@@ -33,10 +33,10 @@ on:
         description: 'Token with write access to the calling repository and to Projects owned by project_owner'
         required: true
 jobs:
-  sync:
+  intake:
     runs-on: ubuntu-latest
     steps:
-      - uses: rubykatzen/starcast/actions/project-sync@main
+      - uses: rubykatzen/starcast/actions/project-intake@main
         with:
           project_owner: ${{ inputs.project_owner }}
           project_number: ${{ inputs.project_number }}

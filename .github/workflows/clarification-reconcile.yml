@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 jobs:
   reconcile:
-    uses: ./.github/workflows/project-sync-shared.yml
+    uses: ./.github/workflows/project-intake-shared.yml
     with:
       project_owner: dupmachine
       project_number: 4
