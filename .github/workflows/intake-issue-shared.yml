@@ -1,4 +1,4 @@
-name: Project Intake
+name: Intake Issue
 on:
   workflow_call:
     inputs:
@@ -36,7 +36,7 @@ jobs:
   intake:
     runs-on: ubuntu-latest
     steps:
-      - uses: rubykatzen/starcast/actions/project-intake@main
+      - uses: rubykatzen/starcast/actions/intake-issue@main
         with:
           project_owner: ${{ inputs.project_owner }}
           project_number: ${{ inputs.project_number }}

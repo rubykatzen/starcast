@@ -4,7 +4,7 @@ on:
     types: [opened]
 jobs:
   intake:
-    uses: ./.github/workflows/project-intake-shared.yml
+    uses: ./.github/workflows/intake-issue-shared.yml
     with:
       project_owner: dupmachine
       project_number: 4

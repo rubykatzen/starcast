@@ -1,4 +1,4 @@
-name: 'Project Intake'
+name: 'Intake Issue'
 description: 'Add issues to a GitHub Project V2 and set an initial Status, idempotently'
 inputs:
   project_owner:
@@ -38,4 +38,4 @@ runs:
         INITIAL_STATUS: ${{ inputs.initial_status }}
         ISSUE_NUMBER: ${{ inputs.issue_number }}
         ISSUE_TYPES: ${{ inputs.issue_types }}
-      run: python3 "$GITHUB_ACTION_PATH/project_intake.py"
+      run: python3 "$GITHUB_ACTION_PATH/intake_issue.py"

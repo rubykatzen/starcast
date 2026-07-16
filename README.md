@@ -32,20 +32,20 @@ The repository is being rebuilt around this model. The previous autonomous
 editorial pipeline implementation has been removed and is not supported. Its
 history remains available in Git.
 
-The first published reusable workflow, `project-intake-shared.yml`, places issues into
+The first published reusable workflow, `intake-issue-shared.yml`, places issues into
 a Project and sets an initial Status — the entry point for the
 cross-repository clarification process.
 
 ## Reusable workflows
 
-### `project-intake-shared.yml`
+### `intake-issue-shared.yml`
 
 Adds issues to a GitHub Project V2 and sets a Status field, idempotently.
 
 ```yaml
 jobs:
   intake:
-    uses: rubykatzen/starcast/.github/workflows/project-intake-shared.yml@v1
+    uses: rubykatzen/starcast/.github/workflows/intake-issue-shared.yml@v1
     with:
       project_owner: my-org
       project_number: 4
