@@ -1,0 +1,14 @@
+name: Clarification reconcile
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+jobs:
+  reconcile:
+    uses: ./.github/workflows/project-sync.yml
+    with:
+      project_owner: dupmachine
+      project_number: 4
+      initial_status: Incoming
+    secrets:
+      github_token: ${{ secrets.CLARIFICATION_TOKEN }}

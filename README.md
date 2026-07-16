@@ -32,9 +32,50 @@ The repository is being rebuilt around this model. The previous autonomous
 editorial pipeline implementation has been removed and is not supported. Its
 history remains available in Git.
 
-The first planned reusable workflow will place newly opened issues into a
-cross-repository clarification process. No reusable workflow is published by
-the reboot yet.
+The first published reusable workflow, `project-sync.yml`, places issues into
+a Project and sets an initial Status — the entry point for the
+cross-repository clarification process.
+
+## Reusable workflows
+
+### `project-sync.yml`
+
+Adds issues to a GitHub Project V2 and sets a Status field, idempotently.
+
+```yaml
+jobs:
+  intake:
+    uses: rubykatzen/starcast/.github/workflows/project-sync.yml@v1
+    with:
+      project_owner: my-org
+      project_number: 4
+      initial_status: Incoming
+      issue_number: ${{ github.event.issue.number }}  # omit to reconcile every open issue
+      issue_types: Task,Bug                            # omit to accept every type
+    secrets:
+      github_token: ${{ secrets.PROJECT_TOKEN }}
+```
+
+- **Event-driven intake**: pass `issue_number` from an `issues: opened`
+  caller to add exactly that issue.
+- **Reconcile sweep**: omit `issue_number` to scan every open issue in the
+  calling repository and add whichever are missing — a recovery path for
+  missed webhook deliveries or failed runs. Callers drive this from their own
+  `on: schedule` (a `schedule` trigger only fires for the repository that
+  owns the workflow file, so it cannot live inside a reusable workflow) plus
+  `workflow_dispatch` for manual runs.
+- **Idempotent, including archived items**: an issue already linked to the
+  target project — whether its Project item is archived or not — is left
+  untouched. It is never unarchived, never re-added, and this is never an
+  error.
+- **Type filtering**: `issue_types` matches against GitHub's native Issue
+  Type field (`issue.issueType.name`), not labels.
+- `github_token` needs write access to the calling repository's issues and
+  to Projects owned by `project_owner`; StarCast stores no consumer secrets.
+
+This repository is itself a consumer: `clarification-intake.yml` and
+`clarification-reconcile.yml` route issues opened in `rubykatzen/starcast`
+into the shared `dupmachine/Clarification` Project.
 
 ## Workflow API
 

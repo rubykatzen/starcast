@@ -1,0 +1,14 @@
+name: Clarification intake
+on:
+  issues:
+    types: [opened]
+jobs:
+  intake:
+    uses: ./.github/workflows/project-sync.yml
+    with:
+      project_owner: dupmachine
+      project_number: 4
+      initial_status: Incoming
+      issue_number: ${{ github.event.issue.number }}
+    secrets:
+      github_token: ${{ secrets.CLARIFICATION_TOKEN }}
