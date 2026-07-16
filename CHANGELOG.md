@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- `route-issue-shared.yml` reusable workflow: transfers an issue to
+  another repository when a configured label is applied, idempotently
+  (verified: a retry after a completed transfer is a clean no-op, not a
+  duplicate or an error). Exact label-to-repo routing only; unmatched
+  labels and source-equals-destination are clean no-ops.
+
 ## [v0.1.2] - 2026-07-16
 
 - perf: scope project.items() query to the calling repo (#29)
