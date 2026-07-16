@@ -36,14 +36,7 @@ jobs:
   intake:
     runs-on: ubuntu-latest
     steps:
-      # TODO: pin to a floating major tag (@v0, matching baseline/releaser's
-      # own convention) once a release exists that includes this action.
-      # Pinning now would break self-consumption immediately after merge,
-      # since @v0 currently resolves to the pre-this-PR release, which
-      # predates actions/intake-issue entirely. Until then, external
-      # consumers pinning intake-issue-shared.yml@vX still get whatever is
-      # on @main here, which is a known gap in the version-pinning contract.
-      - uses: rubykatzen/starcast/actions/intake-issue@main
+      - uses: rubykatzen/starcast/actions/intake-issue@v0.1
         with:
           project_owner: ${{ inputs.project_owner }}
           project_number: ${{ inputs.project_number }}

@@ -45,7 +45,7 @@ Adds issues to a GitHub Project V2 and sets a Status field, idempotently.
 ```yaml
 jobs:
   intake:
-    uses: rubykatzen/starcast/.github/workflows/intake-issue-shared.yml@v1
+    uses: rubykatzen/starcast/.github/workflows/intake-issue-shared.yml@v0.1
     with:
       project_owner: my-org
       project_number: 4
@@ -91,12 +91,17 @@ set in one place instead of kept in sync across two files).
 Reusable workflows live directly in `.github/workflows/` and expose their
 contract through `workflow_call` inputs, secrets, permissions, and outputs.
 
-Consumers should reference a released major version:
+Consumers should reference a released version — currently `v0.1`, the
+floating minor line (matching the convention `rubykatzen/baseline` and
+`rubykatzen/releaser` already use for their own pre-1.0 floating tags,
+e.g. `@v0.7`; SemVer treats `0.x` releases as initial development, where
+minor bumps may be breaking, so pinning the minor rather than just the
+major is the closer equivalent to a stable version pin until `v1` ships):
 
 ```yaml
 jobs:
   example:
-    uses: rubykatzen/starcast/.github/workflows/example.yml@v1
+    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.1
 ```
 
 Pinning an immutable commit SHA provides the strongest supply-chain guarantee.
