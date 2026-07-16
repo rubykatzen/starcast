@@ -1,0 +1,42 @@
+name: Prepare release branch
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: New version without v prefix (e.g. 0.1.0)
+        required: true
+        type: string
+      base_sha:
+        description: Expected HEAD SHA of main
+        required: true
+        type: string
+concurrency:
+  group: prepare-release-starcast
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: rubykatzen/releaser/.github/actions/verify-release@v0.5
+        with:
+          base_sha: ${{ inputs.base_sha }}
+          ci_workflow: lint / lint
+      - uses: rubykatzen/releaser/.github/actions/generate-notes@v0.5
+        id: notes
+        with:
+          version: ${{ inputs.version }}
+      - uses: rubykatzen/releaser/.github/actions/prepare-release-branch@v0.5
+        with:
+          version: ${{ inputs.version }}
+      - uses: rubykatzen/releaser/.github/actions/update-changelog@v0.5
+        with:
+          version: ${{ inputs.version }}
+          notes: ${{ steps.notes.outputs.notes }}
+      - uses: rubykatzen/releaser/.github/actions/push-release-branch@v0.5
+        with:
+          version: ${{ inputs.version }}
