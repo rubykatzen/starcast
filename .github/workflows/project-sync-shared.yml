@@ -22,7 +22,8 @@ on:
       issue_number:
         description: 'Process only this issue (event-driven intake). Omit to reconcile every open issue in the calling repository.'
         required: false
-        type: number
+        type: string
+        default: ''
       issue_types:
         description: 'Comma-separated allow-list of native GitHub Issue Types (e.g. "Task,Bug"). Omit to accept every type.'
         required: false
@@ -35,15 +36,12 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Sync issues into project
-        env:
-          GH_TOKEN: ${{ secrets.github_token }}
-          REPOSITORY: ${{ github.repository }}
-          PROJECT_OWNER: ${{ inputs.project_owner }}
-          PROJECT_NUMBER: ${{ inputs.project_number }}
-          STATUS_FIELD: ${{ inputs.status_field }}
-          INITIAL_STATUS: ${{ inputs.initial_status }}
-          ISSUE_NUMBER: ${{ inputs.issue_number }}
-          ISSUE_TYPES: ${{ inputs.issue_types }}
-        run: python3 .github/scripts/project_sync.py
+      - uses: rubykatzen/starcast/actions/project-sync@main
+        with:
+          project_owner: ${{ inputs.project_owner }}
+          project_number: ${{ inputs.project_number }}
+          status_field: ${{ inputs.status_field }}
+          initial_status: ${{ inputs.initial_status }}
+          issue_number: ${{ inputs.issue_number }}
+          issue_types: ${{ inputs.issue_types }}
+          github_token: ${{ secrets.github_token }}

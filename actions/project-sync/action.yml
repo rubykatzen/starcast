@@ -1,0 +1,41 @@
+name: 'Project Sync'
+description: 'Add issues to a GitHub Project V2 and set an initial Status, idempotently'
+inputs:
+  project_owner:
+    description: 'Org login that owns the target Project'
+    required: true
+  project_number:
+    description: 'Numeric Project V2 number'
+    required: true
+  initial_status:
+    description: 'Status option to set on newly added items'
+    required: true
+  status_field:
+    description: 'Name of the single-select Status field'
+    required: false
+    default: 'Status'
+  issue_number:
+    description: 'Process only this issue. Empty means reconcile every open issue in the calling repository.'
+    required: false
+    default: ''
+  issue_types:
+    description: 'Comma-separated allow-list of native GitHub Issue Types. Empty accepts every type.'
+    required: false
+    default: ''
+  github_token:
+    description: 'Token with write access to the calling repository and to Projects owned by project_owner'
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        REPOSITORY: ${{ github.repository }}
+        PROJECT_OWNER: ${{ inputs.project_owner }}
+        PROJECT_NUMBER: ${{ inputs.project_number }}
+        STATUS_FIELD: ${{ inputs.status_field }}
+        INITIAL_STATUS: ${{ inputs.initial_status }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+        ISSUE_TYPES: ${{ inputs.issue_types }}
+      run: python3 "$GITHUB_ACTION_PATH/project_sync.py"
