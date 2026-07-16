@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v0.1.1] - 2026-07-16
+
+- fix: check membership via project-side scan, not issue.projectItems (#24)
+
 ## [v0.1.0] - 2026-07-16
 
 ### Added
