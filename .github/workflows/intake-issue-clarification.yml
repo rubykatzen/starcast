@@ -1,4 +1,4 @@
-name: Clarification
+name: 'Intake Issue: Clarification'
 on:
   issues:
     types: [opened]
@@ -6,7 +6,7 @@ on:
     - cron: '0 */2 * * *'
   workflow_dispatch:
 jobs:
-  sync:
+  intake:
     uses: ./.github/workflows/intake-issue-shared.yml
     with:
       project_owner: dupmachine

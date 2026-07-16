@@ -7,7 +7,7 @@
 - `intake-issue-shared.yml` reusable workflow: adds issues to a GitHub Project V2 and
   sets an initial Status, idempotently (including archived items), with
   event-driven and reconcile-sweep modes and optional Issue Type filtering.
-- `clarification.yml`: this repository now routes its own issues into the
+- `intake-issue-clarification.yml`: this repository now routes its own issues into the
   `dupmachine`/`Clarification` Project via `intake-issue-shared.yml`,
   combining event-driven intake and a scheduled reconcile sweep (every 2h)
   in one caller.
