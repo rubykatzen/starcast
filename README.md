@@ -86,6 +86,42 @@ Project, combining event-driven intake and the scheduled reconcile sweep in
 one caller (one `with:` block, so config and future filters only need to be
 set in one place instead of kept in sync across two files).
 
+### `route-issue-shared.yml`
+
+Transfers an issue to another repository when a configured label is
+applied, idempotently.
+
+```yaml
+jobs:
+  route:
+    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.1
+    with:
+      routes: '{"Household": "dupmachine/ground-control", "Meds": "dupmachine/meds"}'
+      label_name: ${{ github.event.label.name }}
+      issue_number: ${{ github.event.issue.number }}
+      create_labels_if_missing: false
+    secrets:
+      token: ${{ secrets.ROUTE_TOKEN }}
+```
+
+Caller triggers on `issues: labeled`.
+
+- **Exact match only**: `routes` maps exact label names to `owner/repo`.
+  A label with no configured route is a clean no-op, not an error —
+  StarCast never derives a destination from untrusted label text.
+- **Idempotent, verified against real transfers**: after a transfer, the
+  issue's old id and its `owner/repo#number` address both stop resolving
+  on the source side. A retry that can't find the issue there anymore is
+  treated as an already-completed transfer, not an error.
+- **Source equal to destination** is a clean no-op.
+- **Label carry-over** is off by default (`create_labels_if_missing:
+  false`) — GitHub's own transfer behavior otherwise silently drops a
+  label with no same-named counterpart at the destination, which is
+  usually what you want for a routing label. Set it to `true` to have
+  GitHub create the label at the destination instead.
+- `token` needs write access to both the source and destination
+  repositories; StarCast stores no consumer secrets.
+
 ## Workflow API
 
 Reusable workflows live directly in `.github/workflows/` and expose their

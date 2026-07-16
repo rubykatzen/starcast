@@ -1,0 +1,31 @@
+name: 'Route Issue'
+description: 'Transfer an issue to another repository based on a configured label, idempotently'
+inputs:
+  routes:
+    description: 'JSON object mapping exact label names to destination "owner/repo"'
+    required: true
+  label_name:
+    description: 'Label that triggered this run (e.g. github.event.label.name)'
+    required: true
+  issue_number:
+    description: 'Number of the issue to route (e.g. github.event.issue.number)'
+    required: true
+  create_labels_if_missing:
+    description: 'Create the triggering label at the destination if it does not already exist there'
+    required: false
+    default: 'false'
+  github_token:
+    description: 'Token with write access to the source and destination repositories'
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        REPOSITORY: ${{ github.repository }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+        ROUTES: ${{ inputs.routes }}
+        LABEL_NAME: ${{ inputs.label_name }}
+        CREATE_LABELS_IF_MISSING: ${{ inputs.create_labels_if_missing }}
+      run: python3 "$GITHUB_ACTION_PATH/route_issue.py"
