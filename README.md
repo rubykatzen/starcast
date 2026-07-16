@@ -53,7 +53,7 @@ jobs:
       issue_number: ${{ github.event.issue.number }}  # omit to reconcile every open issue
       issue_types: Task,Bug                            # omit to accept every type
     secrets:
-      github_token: ${{ secrets.PROJECT_TOKEN }}
+      project_token: ${{ secrets.PROJECT_TOKEN }}
 ```
 
 - **Event-driven intake**: pass `issue_number` from an `issues: opened`
@@ -74,8 +74,11 @@ jobs:
   error.
 - **Type filtering**: `issue_types` matches against GitHub's native Issue
   Type field (`issue.issueType.name`), not labels.
-- `github_token` needs write access to the calling repository's issues and
+- `project_token` needs write access to the calling repository's issues and
   to Projects owned by `project_owner`; StarCast stores no consumer secrets.
+  It can't be named `github_token` — GitHub reserves that name in
+  `workflow_call`'s `secrets:` block because it collides with the built-in
+  `GITHUB_TOKEN`.
 
 This repository is itself a consumer: `intake-issue-clarification.yml` routes issues
 opened in `rubykatzen/starcast` into the shared `dupmachine/Clarification`
