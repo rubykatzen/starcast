@@ -14,4 +14,4 @@ jobs:
       initial_status: Incoming
       issue_number: ${{ github.event_name == 'issues' && github.event.issue.number || '' }}
     secrets:
-      github_token: ${{ secrets.CLARIFICATION_TOKEN }}
+      project_token: ${{ secrets.CLARIFICATION_TOKEN }}

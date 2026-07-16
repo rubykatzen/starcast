@@ -29,7 +29,7 @@ on:
         required: false
         type: string
     secrets:
-      github_token:
+      project_token:
         description: 'Token with write access to the calling repository and to Projects owned by project_owner'
         required: true
 jobs:
@@ -51,4 +51,4 @@ jobs:
           initial_status: ${{ inputs.initial_status }}
           issue_number: ${{ inputs.issue_number }}
           issue_types: ${{ inputs.issue_types }}
-          github_token: ${{ secrets.github_token }}
+          github_token: ${{ secrets.project_token }}
