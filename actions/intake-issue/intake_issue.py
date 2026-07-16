@@ -11,15 +11,27 @@ not — is never re-added or unarchived, and never has its Status overwritten
 once set (a later run must not reset an issue a human has already moved
 past Incoming).
 
-Membership is checked by scanning the *project's* items (ProjectV2.items),
-not the issue's reverse projectItems connection. That reverse connection
-is unreliable when the issue's repository and the project belong to
+Membership is checked by querying the *project's* items (ProjectV2.items),
+scoped to this repo via the `query: "repo:owner/name"` filter, not the
+issue's reverse projectItems connection. That reverse connection is
+unreliable when the issue's repository and the project belong to
 different organizations: verified directly (via node(id:) lookups and the
 project's own forward `items` connection) that a confirmed, real link can
 still report zero items through issue.projectItems in that case, while the
-project-side query correctly sees it. Since this is exactly the topology
-StarCast is built for (a project's issues living across repos/orgs), the
-project-side scan is the only reliable check, not an edge-case fallback.
+project-side query correctly sees it, including archived items. Since
+this is exactly the topology StarCast is built for (a project's issues
+living across repos/orgs), this is the primary path, not an edge-case
+fallback. Scoping by repo also keeps the query's cost bounded by how many
+of *this* repo's issues are in the project, not the project's total size,
+which matters because a shared project used by many repos only grows.
+
+GitHub's Projects V2 backend has its own, undocumented eventual-consistency
+gaps beyond this specific one — e.g. addProjectV2ItemById has been
+observed to return success with a valid item id that isn't immediately
+visible through any query, including this one. No client-side query
+strategy can fully paper over that; the scheduled reconcile sweep exists
+partly to give a transient backend inconsistency time to resolve itself
+before the next check.
 
 It also matters *when* the check runs: addProjectV2ItemById unarchives an
 already-linked archived item as a side effect of the call itself (verified
@@ -111,21 +123,29 @@ def resolve_status_option(project_id: str, field_name: str, option_name: str) ->
     sys.exit(1)
 
 
-def fetch_project_items(project_owner: str, project_number: int, status_field: str) -> dict[str, dict]:
-    """Return {issue_node_id: {item_id, is_archived, status}} for the whole project.
+def fetch_project_items(
+    project_owner: str, project_number: int, status_field: str, repo_owner: str, repo_name: str
+) -> dict[str, dict]:
+    """Return {issue_node_id: {item_id, is_archived, status}}, scoped to this repo.
 
     See the module docstring for why this has to be a project-side scan
-    rather than a per-issue reverse lookup.
+    rather than a per-issue reverse lookup. Scoping with items' `query`
+    argument (`repo:owner/name`) keeps the cost bounded by how many of
+    *our* issues are in the project, not the project's total size — a
+    shared project used by many repos only grows over time, and a full
+    unscoped scan would too. Verified this still returns archived items
+    (an archived test item stayed in the filtered results), so it's not
+    trading correctness for cost.
     """
     index: dict[str, dict] = {}
     cursor = None
     while True:
         data = gh_graphql(
             """
-            query($owner: String!, $number: Int!, $after: String, $statusField: String!) {
+            query($owner: String!, $number: Int!, $after: String, $statusField: String!, $filter: String!) {
               organization(login: $owner) {
                 projectV2(number: $number) {
-                  items(first: 100, after: $after, archivedStates: [ARCHIVED, NOT_ARCHIVED]) {
+                  items(first: 100, after: $after, query: $filter, archivedStates: [ARCHIVED, NOT_ARCHIVED]) {
                     pageInfo { hasNextPage endCursor }
                     nodes {
                       id
@@ -144,6 +164,7 @@ def fetch_project_items(project_owner: str, project_number: int, status_field: s
             number=project_number,
             after=cursor,
             statusField=status_field,
+            filter=f"repo:{repo_owner}/{repo_name}",
         )
         page = data["organization"]["projectV2"]["items"]
         for item in page["nodes"]:
@@ -248,7 +269,7 @@ def main() -> None:
 
     project_id = resolve_project(project_owner, project_number)
     field_id, option_id = resolve_status_option(project_id, status_field, initial_status)
-    project_items = fetch_project_items(project_owner, project_number, status_field)
+    project_items = fetch_project_items(project_owner, project_number, status_field, repo_owner, repo_name)
 
     issues = (
         fetch_single_issue(repo_owner, repo_name, int(issue_number))
