@@ -7,10 +7,17 @@ Two modes, selected by whether ISSUE_NUMBER is set:
     add any that are missing from the project (failure-recovery sweep).
 
 Idempotency: an issue already linked to the target project — archived or
-not — is never re-added or unarchived. Membership is checked with a query
-before any mutation runs, rather than relying on addProjectV2ItemById's own
-idempotency, because that mutation's behavior for archived items isn't
-something we can safely assume.
+not — is never re-added or unarchived, and never has its Status overwritten
+once set (a later run must not reset an issue a human has already moved
+past Incoming). Membership is checked with a query before any mutation
+runs, rather than relying on addProjectV2ItemById's own idempotency,
+because that mutation's behavior for archived items isn't something we can
+safely assume.
+
+The one case that IS repaired on a later run: an item that's linked to the
+project but has no Status value at all, which only happens if a previous
+run added the item and then failed/was cancelled before setting its Status.
+That's a partial failure, not a human decision, so it's safe to complete.
 """
 
 import json
@@ -101,15 +108,21 @@ ISSUE_FIELDS = f"""
     number
     issueType {{ name }}
     projectItems(first: {PROJECT_ITEMS_PAGE_SIZE}, includeArchived: true) {{
-      nodes {{ project {{ id }} }}
+      nodes {{
+        id
+        project {{ id }}
+        fieldValueByName(name: $statusField) {{
+          ... on ProjectV2ItemFieldSingleSelectValue {{ name }}
+        }}
+      }}
     }}
 """
 
 
-def fetch_single_issue(owner: str, repo: str, number: int) -> list[dict]:
+def fetch_single_issue(owner: str, repo: str, number: int, status_field: str) -> list[dict]:
     data = gh_graphql(
         f"""
-        query($owner: String!, $repo: String!, $number: Int!) {{
+        query($owner: String!, $repo: String!, $number: Int!, $statusField: String!) {{
           repository(owner: $owner, name: $repo) {{
             issue(number: $number) {{ {ISSUE_FIELDS} }}
           }}
@@ -118,6 +131,7 @@ def fetch_single_issue(owner: str, repo: str, number: int) -> list[dict]:
         owner=owner,
         repo=repo,
         number=number,
+        statusField=status_field,
     )
     issue = data["repository"]["issue"]
     if not issue:
@@ -126,13 +140,13 @@ def fetch_single_issue(owner: str, repo: str, number: int) -> list[dict]:
     return [issue]
 
 
-def fetch_open_issues(owner: str, repo: str) -> list[dict]:
+def fetch_open_issues(owner: str, repo: str, status_field: str) -> list[dict]:
     issues = []
     cursor = None
     while True:
         data = gh_graphql(
             f"""
-            query($owner: String!, $repo: String!, $after: String) {{
+            query($owner: String!, $repo: String!, $after: String, $statusField: String!) {{
               repository(owner: $owner, name: $repo) {{
                 issues(states: OPEN, first: 100, after: $after) {{
                   pageInfo {{ hasNextPage endCursor }}
@@ -144,6 +158,7 @@ def fetch_open_issues(owner: str, repo: str) -> list[dict]:
             owner=owner,
             repo=repo,
             after=cursor,
+            statusField=status_field,
         )
         page = data["repository"]["issues"]
         issues += page["nodes"]
@@ -153,7 +168,14 @@ def fetch_open_issues(owner: str, repo: str) -> list[dict]:
     return issues
 
 
-def add_issue(project_id: str, issue_node_id: str, field_id: str, option_id: str) -> None:
+def find_item(issue: dict, project_id: str) -> dict | None:
+    return next(
+        (item for item in issue["projectItems"]["nodes"] if item["project"]["id"] == project_id),
+        None,
+    )
+
+
+def add_item(project_id: str, issue_node_id: str) -> str:
     data = gh_graphql(
         """
         mutation($projectId: ID!, $contentId: ID!) {
@@ -165,7 +187,10 @@ def add_issue(project_id: str, issue_node_id: str, field_id: str, option_id: str
         projectId=project_id,
         contentId=issue_node_id,
     )
-    item_id = data["addProjectV2ItemById"]["item"]["id"]
+    return data["addProjectV2ItemById"]["item"]["id"]
+
+
+def set_status(project_id: str, item_id: str, field_id: str, option_id: str) -> None:
     gh_graphql(
         """
         mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
@@ -184,10 +209,6 @@ def add_issue(project_id: str, issue_node_id: str, field_id: str, option_id: str
     )
 
 
-def already_in_project(issue: dict, project_id: str) -> bool:
-    return any(item["project"]["id"] == project_id for item in issue["projectItems"]["nodes"])
-
-
 def main() -> None:
     project_owner = os.environ["PROJECT_OWNER"]
     project_number = int(os.environ["PROJECT_NUMBER"])
@@ -201,25 +222,37 @@ def main() -> None:
     field_id, option_id = resolve_status_option(project_id, status_field, initial_status)
 
     issues = (
-        fetch_single_issue(repo_owner, repo_name, int(issue_number))
+        fetch_single_issue(repo_owner, repo_name, int(issue_number), status_field)
         if issue_number
-        else fetch_open_issues(repo_owner, repo_name)
+        else fetch_open_issues(repo_owner, repo_name, status_field)
     )
 
-    added, skipped_present, skipped_type = [], [], []
+    added, repaired, skipped_present, skipped_type = [], [], [], []
     for issue in issues:
         if issue_types and (issue["issueType"] or {}).get("name") not in issue_types:
             skipped_type.append(issue["number"])
             continue
-        if already_in_project(issue, project_id):
-            skipped_present.append(issue["number"])
+        existing = find_item(issue, project_id)
+        if existing:
+            if existing["fieldValueByName"] is None:
+                # Item exists but its Status was never set — a previous run
+                # added it and then failed/was cancelled before completing.
+                # Complete it now; a real Status value (even a different
+                # one) means a human or a later phase already acted on it,
+                # so it's left alone.
+                set_status(project_id, existing["id"], field_id, option_id)
+                repaired.append(issue["number"])
+            else:
+                skipped_present.append(issue["number"])
             continue
-        add_issue(project_id, issue["id"], field_id, option_id)
+        item_id = add_item(project_id, issue["id"])
+        set_status(project_id, item_id, field_id, option_id)
         added.append(issue["number"])
 
     summary = (
         f"### intake-issue: {repo_owner}/{repo_name} -> {project_owner}/#{project_number}\n\n"
         f"- Added ({initial_status}): {added or 'none'}\n"
+        f"- Repaired (had no Status, now {initial_status}): {repaired or 'none'}\n"
         f"- Already present (untouched, incl. archived): {skipped_present or 'none'}\n"
         f"- Skipped (issue type filter): {skipped_type or 'none'}\n"
     )
