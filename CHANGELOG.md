@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [v0.1.2] - 2026-07-16
+
+- perf: scope project.items() query to the calling repo (#29)
+- chore: pin actions/intake-issue to @v0.1, fix README's @v1 example (#26)
+
 ## [v0.1.1] - 2026-07-16
 
 - fix: check membership via project-side scan, not issue.projectItems (#24)
