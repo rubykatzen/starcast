@@ -9,27 +9,35 @@ Two modes, selected by whether ISSUE_NUMBER is set:
 Idempotency: an issue already linked to the target project — archived or
 not — is never re-added or unarchived, and never has its Status overwritten
 once set (a later run must not reset an issue a human has already moved
-past Incoming). Membership is checked with a query before any mutation
-runs, rather than relying on addProjectV2ItemById's own idempotency,
-because that mutation's behavior for archived items isn't something we can
-safely assume.
+past Incoming).
 
-The one case that IS repaired on a later run: an item that's linked to the
-project but has no Status value at all, which only happens if a previous
-run added the item and then failed/was cancelled before setting its Status.
-That's a partial failure, not a human decision, so it's safe to complete.
+Membership is checked by scanning the *project's* items (ProjectV2.items),
+not the issue's reverse projectItems connection. That reverse connection
+is unreliable when the issue's repository and the project belong to
+different organizations: verified directly (via node(id:) lookups and the
+project's own forward `items` connection) that a confirmed, real link can
+still report zero items through issue.projectItems in that case, while the
+project-side query correctly sees it. Since this is exactly the topology
+StarCast is built for (a project's issues living across repos/orgs), the
+project-side scan is the only reliable check, not an edge-case fallback.
+
+It also matters *when* the check runs: addProjectV2ItemById unarchives an
+already-linked archived item as a side effect of the call itself (verified
+directly — isArchived flips true -> false on the same item id, no
+duplicate created). So an archived item must never reach that mutation at
+all; there's no fixing it up afterward.
+
+The one case that IS repaired on a later run: a non-archived item that's
+linked to the project but has no Status value at all, which only happens
+if a previous run added the item and then failed/was cancelled before
+setting its Status. That's a partial failure, not a human decision, so
+it's safe to complete.
 """
 
 import json
 import os
 import subprocess
 import sys
-
-# projectItems page size. An issue linked to more than this many projects
-# could have its target project item missed on the first page, which would
-# break the idempotency guarantee for that issue; 100 is GitHub's max page
-# size and comfortably covers realistic usage.
-PROJECT_ITEMS_PAGE_SIZE = 100
 
 
 def gh_graphql(query: str, **variables: str | int | None) -> dict:
@@ -103,35 +111,63 @@ def resolve_status_option(project_id: str, field_name: str, option_name: str) ->
     sys.exit(1)
 
 
-ISSUE_FIELDS = f"""
-    id
-    number
-    issueType {{ name }}
-    projectItems(first: {PROJECT_ITEMS_PAGE_SIZE}, includeArchived: true) {{
-      nodes {{
-        id
-        project {{ id }}
-        fieldValueByName(name: $statusField) {{
-          ... on ProjectV2ItemFieldSingleSelectValue {{ name }}
-        }}
-      }}
-    }}
-"""
+def fetch_project_items(project_owner: str, project_number: int, status_field: str) -> dict[str, dict]:
+    """Return {issue_node_id: {item_id, is_archived, status}} for the whole project.
+
+    See the module docstring for why this has to be a project-side scan
+    rather than a per-issue reverse lookup.
+    """
+    index: dict[str, dict] = {}
+    cursor = None
+    while True:
+        data = gh_graphql(
+            """
+            query($owner: String!, $number: Int!, $after: String, $statusField: String!) {
+              organization(login: $owner) {
+                projectV2(number: $number) {
+                  items(first: 100, after: $after, archivedStates: [ARCHIVED, NOT_ARCHIVED]) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      id
+                      isArchived
+                      fieldValueByName(name: $statusField) {
+                        ... on ProjectV2ItemFieldSingleSelectValue { name }
+                      }
+                      content { ... on Issue { id } }
+                    }
+                  }
+                }
+              }
+            }
+            """,
+            owner=project_owner,
+            number=project_number,
+            after=cursor,
+            statusField=status_field,
+        )
+        page = data["organization"]["projectV2"]["items"]
+        for item in page["nodes"]:
+            content = item.get("content")
+            if content and "id" in content:
+                index[content["id"]] = item
+        if not page["pageInfo"]["hasNextPage"]:
+            break
+        cursor = page["pageInfo"]["endCursor"]
+    return index
 
 
-def fetch_single_issue(owner: str, repo: str, number: int, status_field: str) -> list[dict]:
+def fetch_single_issue(owner: str, repo: str, number: int) -> list[dict]:
     data = gh_graphql(
-        f"""
-        query($owner: String!, $repo: String!, $number: Int!, $statusField: String!) {{
-          repository(owner: $owner, name: $repo) {{
-            issue(number: $number) {{ {ISSUE_FIELDS} }}
-          }}
-        }}
+        """
+        query($owner: String!, $repo: String!, $number: Int!) {
+          repository(owner: $owner, name: $repo) {
+            issue(number: $number) { id number issueType { name } }
+          }
+        }
         """,
         owner=owner,
         repo=repo,
         number=number,
-        statusField=status_field,
     )
     issue = data["repository"]["issue"]
     if not issue:
@@ -140,25 +176,24 @@ def fetch_single_issue(owner: str, repo: str, number: int, status_field: str) ->
     return [issue]
 
 
-def fetch_open_issues(owner: str, repo: str, status_field: str) -> list[dict]:
+def fetch_open_issues(owner: str, repo: str) -> list[dict]:
     issues = []
     cursor = None
     while True:
         data = gh_graphql(
-            f"""
-            query($owner: String!, $repo: String!, $after: String, $statusField: String!) {{
-              repository(owner: $owner, name: $repo) {{
-                issues(states: OPEN, first: 100, after: $after) {{
-                  pageInfo {{ hasNextPage endCursor }}
-                  nodes {{ {ISSUE_FIELDS} }}
-                }}
-              }}
-            }}
+            """
+            query($owner: String!, $repo: String!, $after: String) {
+              repository(owner: $owner, name: $repo) {
+                issues(states: OPEN, first: 100, after: $after) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes { id number issueType { name } }
+                }
+              }
+            }
             """,
             owner=owner,
             repo=repo,
             after=cursor,
-            statusField=status_field,
         )
         page = data["repository"]["issues"]
         issues += page["nodes"]
@@ -166,13 +201,6 @@ def fetch_open_issues(owner: str, repo: str, status_field: str) -> list[dict]:
             break
         cursor = page["pageInfo"]["endCursor"]
     return issues
-
-
-def find_item(issue: dict, project_id: str) -> dict | None:
-    return next(
-        (item for item in issue["projectItems"]["nodes"] if item["project"]["id"] == project_id),
-        None,
-    )
 
 
 def add_item(project_id: str, issue_node_id: str) -> str:
@@ -220,26 +248,28 @@ def main() -> None:
 
     project_id = resolve_project(project_owner, project_number)
     field_id, option_id = resolve_status_option(project_id, status_field, initial_status)
+    project_items = fetch_project_items(project_owner, project_number, status_field)
 
     issues = (
-        fetch_single_issue(repo_owner, repo_name, int(issue_number), status_field)
+        fetch_single_issue(repo_owner, repo_name, int(issue_number))
         if issue_number
-        else fetch_open_issues(repo_owner, repo_name, status_field)
+        else fetch_open_issues(repo_owner, repo_name)
     )
 
-    added, repaired, skipped_present, skipped_type = [], [], [], []
+    added, repaired, skipped_present, skipped_archived, skipped_type = [], [], [], [], []
     for issue in issues:
         if issue_types and (issue["issueType"] or {}).get("name") not in issue_types:
             skipped_type.append(issue["number"])
             continue
-        existing = find_item(issue, project_id)
+        existing = project_items.get(issue["id"])
         if existing:
-            if existing["fieldValueByName"] is None:
-                # Item exists but its Status was never set — a previous run
-                # added it and then failed/was cancelled before completing.
-                # Complete it now; a real Status value (even a different
-                # one) means a human or a later phase already acted on it,
-                # so it's left alone.
+            if existing["isArchived"]:
+                # Never call addProjectV2ItemById or any mutation on an
+                # archived item — the add mutation itself unarchives it as
+                # a side effect, and there's no way to undo that after the
+                # fact. Leave it fully alone.
+                skipped_archived.append(issue["number"])
+            elif existing["fieldValueByName"] is None:
                 set_status(project_id, existing["id"], field_id, option_id)
                 repaired.append(issue["number"])
             else:
@@ -253,7 +283,8 @@ def main() -> None:
         f"### intake-issue: {repo_owner}/{repo_name} -> {project_owner}/#{project_number}\n\n"
         f"- Added ({initial_status}): {added or 'none'}\n"
         f"- Repaired (had no Status, now {initial_status}): {repaired or 'none'}\n"
-        f"- Already present (untouched, incl. archived): {skipped_present or 'none'}\n"
+        f"- Already present (untouched): {skipped_present or 'none'}\n"
+        f"- Already present, archived (untouched): {skipped_archived or 'none'}\n"
         f"- Skipped (issue type filter): {skipped_type or 'none'}\n"
     )
     print(summary)
