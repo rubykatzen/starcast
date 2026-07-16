@@ -4,12 +4,12 @@
 
 ### Added
 
-- `project-sync.yml` reusable workflow: adds issues to a GitHub Project V2 and
+- `project-sync-shared.yml` reusable workflow: adds issues to a GitHub Project V2 and
   sets an initial Status, idempotently (including archived items), with
   event-driven and reconcile-sweep modes and optional Issue Type filtering.
 - `clarification-intake.yml` and `clarification-reconcile.yml`: this
   repository now routes its own issues into the `dupmachine`/`Clarification`
-  Project via `project-sync.yml`.
+  Project via `project-sync-shared.yml`.
 
 ## [v0.0.1] - 2026-07-16
 

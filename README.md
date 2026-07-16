@@ -32,20 +32,20 @@ The repository is being rebuilt around this model. The previous autonomous
 editorial pipeline implementation has been removed and is not supported. Its
 history remains available in Git.
 
-The first published reusable workflow, `project-sync.yml`, places issues into
+The first published reusable workflow, `project-sync-shared.yml`, places issues into
 a Project and sets an initial Status — the entry point for the
 cross-repository clarification process.
 
 ## Reusable workflows
 
-### `project-sync.yml`
+### `project-sync-shared.yml`
 
 Adds issues to a GitHub Project V2 and sets a Status field, idempotently.
 
 ```yaml
 jobs:
   intake:
-    uses: rubykatzen/starcast/.github/workflows/project-sync.yml@v1
+    uses: rubykatzen/starcast/.github/workflows/project-sync-shared.yml@v1
     with:
       project_owner: my-org
       project_number: 4
