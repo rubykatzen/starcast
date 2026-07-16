@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.1.0] - 2026-07-16
+
 ### Added
 
 - `intake-issue-shared.yml` reusable workflow: adds issues to a GitHub Project V2 and
