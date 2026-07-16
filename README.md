@@ -77,9 +77,11 @@ jobs:
 - `github_token` needs write access to the calling repository's issues and
   to Projects owned by `project_owner`; StarCast stores no consumer secrets.
 
-This repository is itself a consumer: `clarification-intake.yml` and
-`clarification-reconcile.yml` route issues opened in `rubykatzen/starcast`
-into the shared `dupmachine/Clarification` Project.
+This repository is itself a consumer: `clarification.yml` routes issues
+opened in `rubykatzen/starcast` into the shared `dupmachine/Clarification`
+Project, combining event-driven intake and the scheduled reconcile sweep in
+one caller (one `with:` block, so config and future filters only need to be
+set in one place instead of kept in sync across two files).
 
 ## Workflow API
 
