@@ -36,7 +36,7 @@ jobs:
   intake:
     runs-on: ubuntu-latest
     steps:
-      - uses: rubykatzen/starcast/actions/intake-issue@v0.1
+      - uses: rubykatzen/starcast/actions/intake-issue@v0.2
         with:
           project_owner: ${{ inputs.project_owner }}
           project_number: ${{ inputs.project_number }}
