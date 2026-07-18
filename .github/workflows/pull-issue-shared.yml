@@ -20,15 +20,6 @@ on:
         description: 'Numeric Project V2 number'
         required: true
         type: number
-      initial_status:
-        description: 'Status option to set on newly added items (e.g. Incoming)'
-        required: true
-        type: string
-      status_field:
-        description: 'Name of the single-select Status field'
-        required: false
-        type: string
-        default: 'Status'
     secrets:
       token:
         description: 'Token with read access to the configured organizations/repos and write access to the Project'
@@ -46,6 +37,4 @@ jobs:
           repos: ${{ inputs.repos }}
           project_owner: ${{ inputs.project_owner }}
           project_number: ${{ inputs.project_number }}
-          status_field: ${{ inputs.status_field }}
-          initial_status: ${{ inputs.initial_status }}
           github_token: ${{ secrets.token }}

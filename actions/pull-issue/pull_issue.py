@@ -7,36 +7,19 @@ one workflow here is configured once with a scope (organizations and/or
 individual repos) and periodically discovers and pulls in whatever open
 issues currently exist there. Donor repos need zero configuration.
 
-Discovery uses GitHub's `search` query, not a per-repo issues() scan:
-verified directly that `search(query: "org:A org:B repo:C/D ...")` ORs
-multiple org:/repo: qualifiers together in one call, cost 1 regardless of
-how many are configured. That is NOT true of ProjectV2.items' own `query`
-filter — verified directly that it does not support the same multi-repo OR
-syntax (two repo: qualifiers is parsed as AND, impossible, so it matches
-nothing; an explicit "OR" or a comma-joined list isn't understood and
-silently falls back to an effectively unfiltered scan). So project
-membership is checked with one items(query: "repo:X") call per *unique
-repo that actually has a candidate issue*, not per configured org/repo and
-not an unscoped full-project scan — cost scales with active donor repos,
-not with the shared project's total size or the configured scope's size.
+Organizations are expanded to their repositories first, then combined
+with the explicitly configured repositories and deduplicated. Each
+repository is processed independently: its complete `issues(states: OPEN)`
+connection is compared with Project items filtered to that repository.
+Using repository connections avoids GitHub Search's 1,000-result ceiling.
 
-GitHub's search API has its own hard ceiling worth knowing about: verified
-directly against real orgs that `search` reports an accurate `issueCount`
-(1093 in one real test) but the connection itself only ever yields the
-first 1000 nodes, however many pages you walk. A configured scope whose
-total open-issue count exceeds 1000 will silently miss whatever's past
-that cutoff — there's no error, no warning from the API. Not a concern at
-current scale, but a real ceiling if the configured scope grows large.
-
-Everything below the discovery step (idempotency rules, why membership is
-checked before any mutation, the archived-item unarchive hazard, the
-Status-repair case) is the same reasoning as actions/intake-issue's
-intake_issue.py; see that module's docstring for the full detail. The
-GraphQL helper and resolve_project/resolve_status_option/add_item/
-set_status are duplicated here rather than imported from that action —
-there's no cross-action import mechanism in this repo, and introducing one
-for two call sites would be exactly the kind of abstraction the README
-says to wait on until it's validated by more than one real need.
+Everything below the discovery step follows actions/intake-issue's
+idempotency rules: membership is checked before any mutation, and archived
+items never reach the add mutation because it would unarchive them. Status
+is deliberately left to the target Project's automation. The GraphQL helper
+and resolve_project/add_item are duplicated here rather than imported from
+that action because composite actions have no shared import path in this
+repo.
 """
 
 import json
@@ -89,60 +72,71 @@ def resolve_project(owner: str, number: int) -> str:
     return project["id"]
 
 
-def resolve_status_option(project_id: str, field_name: str, option_name: str) -> tuple[str, str]:
-    data = gh_graphql(
-        """
-        query($id: ID!, $field: String!) {
-          node(id: $id) {
-            ... on ProjectV2 {
-              field(name: $field) {
-                ... on ProjectV2SingleSelectField { id options { id name } }
+def fetch_organization_repositories(organization: str) -> list[str]:
+    """Return every repository visible to the token in one organization."""
+    repositories = []
+    cursor = None
+    while True:
+        data = gh_graphql(
+            """
+            query($organization: String!, $after: String) {
+              organization(login: $organization) {
+                repositories(first: 100, after: $after) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes { nameWithOwner }
+                }
               }
             }
-          }
-        }
-        """,
-        id=project_id,
-        field=field_name,
-    )
-    field = data["node"]["field"]
-    if not field:
-        print(f"ERROR: Project has no field named '{field_name}'", file=sys.stderr)
+            """,
+            organization=organization,
+            after=cursor,
+        )
+        owner = data["organization"]
+        if not owner:
+            print(f"ERROR: organization '{organization}' not found or inaccessible", file=sys.stderr)
+            sys.exit(1)
+        page = owner["repositories"]
+        repositories += [repo["nameWithOwner"] for repo in page["nodes"]]
+        if not page["pageInfo"]["hasNextPage"]:
+            break
+        cursor = page["pageInfo"]["endCursor"]
+    return repositories
+
+
+def fetch_open_issues(repo: str) -> list[dict]:
+    """Return every open issue in one repository."""
+    try:
+        owner, name = repo.split("/", 1)
+    except ValueError:
+        print(f"ERROR: repository '{repo}' must use the 'owner/name' format", file=sys.stderr)
         sys.exit(1)
-    for option in field["options"]:
-        if option["name"] == option_name:
-            return field["id"], option["id"]
-    print(f"ERROR: field '{field_name}' has no option named '{option_name}'", file=sys.stderr)
-    sys.exit(1)
+    if not owner or not name or "/" in name:
+        print(f"ERROR: repository '{repo}' must use the 'owner/name' format", file=sys.stderr)
+        sys.exit(1)
 
-
-def fetch_candidate_issues(organizations: list[str], repos: list[str]) -> list[dict]:
-    """Return every open issue across the configured orgs/repos, one search call
-    (paginated), each tagged with its own repository."""
-    terms = [f"org:{org}" for org in organizations] + [f"repo:{repo}" for repo in repos]
-    query = " ".join([*terms, "is:issue", "is:open"])
     issues = []
     cursor = None
     while True:
         data = gh_graphql(
             """
-            query($search: String!, $after: String) {
-              search(query: $search, type: ISSUE, first: 100, after: $after) {
-                pageInfo { hasNextPage endCursor }
-                nodes {
-                  ... on Issue {
-                    id
-                    number
-                    repository { nameWithOwner }
-                  }
+            query($owner: String!, $name: String!, $after: String) {
+              repository(owner: $owner, name: $name) {
+                issues(states: OPEN, first: 100, after: $after) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes { id number }
                 }
               }
             }
             """,
-            search=query,
+            owner=owner,
+            name=name,
             after=cursor,
         )
-        page = data["search"]
+        repository = data["repository"]
+        if not repository:
+            print(f"ERROR: repository '{repo}' not found or inaccessible", file=sys.stderr)
+            sys.exit(1)
+        page = repository["issues"]
         issues += page["nodes"]
         if not page["pageInfo"]["hasNextPage"]:
             break
@@ -150,18 +144,26 @@ def fetch_candidate_issues(organizations: list[str], repos: list[str]) -> list[d
     return issues
 
 
-def fetch_project_items_for_repo(
-    project_owner: str, project_number: int, status_field: str, repo: str
-) -> dict[str, dict]:
-    """Return {issue_node_id: {item_id, is_archived, status}} for one repo's
-    items in the project. See the module docstring for why this can only be
-    scoped to a single repo per call."""
+def deduplicate_repositories(repositories: list[str]) -> list[str]:
+    """Deduplicate GitHub repository names case-insensitively, preserving order."""
+    unique = []
+    seen = set()
+    for repo in repositories:
+        key = repo.casefold()
+        if key not in seen:
+            seen.add(key)
+            unique.append(repo)
+    return unique
+
+
+def fetch_project_items_for_repo(project_owner: str, project_number: int, repo: str) -> dict[str, dict]:
+    """Return existing Project items by issue node ID for one repository."""
     index: dict[str, dict] = {}
     cursor = None
     while True:
         data = gh_graphql(
             """
-            query($owner: String!, $number: Int!, $after: String, $statusField: String!, $filter: String!) {
+            query($owner: String!, $number: Int!, $after: String, $filter: String!) {
               organization(login: $owner) {
                 projectV2(number: $number) {
                   items(first: 100, after: $after, query: $filter, archivedStates: [ARCHIVED, NOT_ARCHIVED]) {
@@ -169,9 +171,6 @@ def fetch_project_items_for_repo(
                     nodes {
                       id
                       isArchived
-                      fieldValueByName(name: $statusField) {
-                        ... on ProjectV2ItemFieldSingleSelectValue { name }
-                      }
                       content { ... on Issue { id } }
                     }
                   }
@@ -182,7 +181,6 @@ def fetch_project_items_for_repo(
             owner=project_owner,
             number=project_number,
             after=cursor,
-            statusField=status_field,
             filter=f"repo:{repo}",
         )
         page = data["organization"]["projectV2"]["items"]
@@ -196,8 +194,8 @@ def fetch_project_items_for_repo(
     return index
 
 
-def add_item(project_id: str, issue_node_id: str) -> str:
-    data = gh_graphql(
+def add_item(project_id: str, issue_node_id: str) -> None:
+    gh_graphql(
         """
         mutation($projectId: ID!, $contentId: ID!) {
           addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
@@ -208,33 +206,11 @@ def add_item(project_id: str, issue_node_id: str) -> str:
         projectId=project_id,
         contentId=issue_node_id,
     )
-    return data["addProjectV2ItemById"]["item"]["id"]
-
-
-def set_status(project_id: str, item_id: str, field_id: str, option_id: str) -> None:
-    gh_graphql(
-        """
-        mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
-          updateProjectV2ItemFieldValue(input: {
-            projectId: $projectId
-            itemId: $itemId
-            fieldId: $fieldId
-            value: { singleSelectOptionId: $optionId }
-          }) { projectV2Item { id } }
-        }
-        """,
-        projectId=project_id,
-        itemId=item_id,
-        fieldId=field_id,
-        optionId=option_id,
-    )
 
 
 def main() -> None:
     project_owner = os.environ["PROJECT_OWNER"]
     project_number = int(os.environ["PROJECT_NUMBER"])
-    status_field = os.environ.get("STATUS_FIELD", "Status")
-    initial_status = os.environ["INITIAL_STATUS"]
     organizations = [o.strip() for o in os.environ.get("ORGANIZATIONS", "").split(",") if o.strip()]
     repos = [r.strip() for r in os.environ.get("REPOS", "").split(",") if r.strip()]
 
@@ -243,17 +219,18 @@ def main() -> None:
         sys.exit(1)
 
     project_id = resolve_project(project_owner, project_number)
-    field_id, option_id = resolve_status_option(project_id, status_field, initial_status)
 
-    candidates = fetch_candidate_issues(organizations, repos)
+    repositories = list(repos)
+    for organization in organizations:
+        repositories += fetch_organization_repositories(organization)
+    repositories = deduplicate_repositories(repositories)
 
-    by_repo: dict[str, list[dict]] = {}
-    for issue in candidates:
-        by_repo.setdefault(issue["repository"]["nameWithOwner"], []).append(issue)
-
-    added, repaired, skipped_present, skipped_archived = [], [], [], []
-    for repo, issues in by_repo.items():
-        project_items = fetch_project_items_for_repo(project_owner, project_number, status_field, repo)
+    added, skipped_present, skipped_archived = [], [], []
+    for repo in repositories:
+        issues = fetch_open_issues(repo)
+        if not issues:
+            continue
+        project_items = fetch_project_items_for_repo(project_owner, project_number, repo)
         for issue in issues:
             label = f"{repo}#{issue['number']}"
             existing = project_items.get(issue["id"])
@@ -264,20 +241,15 @@ def main() -> None:
                     # as a side effect, and there's no way to undo that
                     # after the fact. Leave it fully alone.
                     skipped_archived.append(label)
-                elif existing["fieldValueByName"] is None:
-                    set_status(project_id, existing["id"], field_id, option_id)
-                    repaired.append(label)
                 else:
                     skipped_present.append(label)
                 continue
-            item_id = add_item(project_id, issue["id"])
-            set_status(project_id, item_id, field_id, option_id)
+            add_item(project_id, issue["id"])
             added.append(label)
 
     summary = (
         f"### pull-issue: {', '.join(organizations + repos)} -> {project_owner}/#{project_number}\n\n"
-        f"- Added ({initial_status}): {added or 'none'}\n"
-        f"- Repaired (had no Status, now {initial_status}): {repaired or 'none'}\n"
+        f"- Added: {added or 'none'}\n"
         f"- Already present (untouched): {skipped_present or 'none'}\n"
         f"- Already present, archived (untouched): {skipped_archived or 'none'}\n"
     )
