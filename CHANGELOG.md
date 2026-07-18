@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.3.0] - 2026-07-18
+
 ### Added
 
 - `pull-issue-shared.yml` reusable workflow: pulls open issues from a
