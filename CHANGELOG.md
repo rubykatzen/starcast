@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- `pull-issue-shared.yml` reusable workflow: pulls open issues from a
+  configured set of organizations and/or repositories into a GitHub
+  Project V2, idempotently — the hub-side (pull) counterpart to
+  `intake-issue-shared.yml`'s push model. Donor repos need no
+  configuration; organizations are expanded to repositories, and each
+  repository's open issues are paginated independently.
+
 ## [v0.2.0] - 2026-07-16
 
 ### Added

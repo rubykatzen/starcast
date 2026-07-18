@@ -122,6 +122,51 @@ Caller triggers on `issues: labeled`.
 - `token` needs write access to both the source and destination
   repositories; StarCast stores no consumer secrets.
 
+### `pull-issue-shared.yml`
+
+Pulls open issues from a configured set of organizations and/or individual
+repositories into a GitHub Project V2, idempotently — the hub-side
+counterpart to `intake-issue-shared.yml`. Instead of every donor repo
+configuring its own caller workflow and token (the push model above), one
+workflow here is configured once and periodically discovers whatever open
+issues currently exist in scope. Donor repos need zero configuration.
+
+```yaml
+jobs:
+  pull:
+    uses: rubykatzen/starcast/.github/workflows/pull-issue-shared.yml@v0.2
+    with:
+      organizations: dupmachine,rubykatzen   # every repo in each org is in scope
+      repos: some-owner/some-repo             # individual repos, comma-separated
+      project_owner: dupmachine
+      project_number: 4
+    secrets:
+      token: ${{ secrets.PULL_TOKEN }}
+```
+
+Caller drives cadence from its own `on: schedule` (same reason as
+`intake-issue-shared.yml`'s reconcile sweep — a `schedule` trigger can't
+live inside a reusable workflow) plus `workflow_dispatch` for manual runs.
+At least one of `organizations`/`repos` must be set.
+
+- **Repository-based discovery** — configured organizations are expanded to
+  their repositories, combined with explicitly configured repositories, and
+  deduplicated. Each repository's complete open-issues connection is then
+  processed independently.
+- **No content filter yet** — every open issue found in scope is pulled.
+  Label- or type-based filtering is a natural addition once a real need
+  shows up.
+- **Idempotent, including archived items** — same guarantees as
+  `intake-issue-shared.yml`: an issue already linked to the project is
+  never re-added or unarchived.
+- **Status is owned by Project automation** — this workflow only adds the
+  issue; configure the target Project's `Item added to project` automation
+  to assign the desired initial Status.
+- `token` needs read access across every configured organization/repo plus
+  write access to the Project — a broader, more centralized credential
+  than the push model's per-repo Project-only token. That's the direct
+  trade-off for not configuring anything on the donor side.
+
 ## Workflow API
 
 Reusable workflows live directly in `.github/workflows/` and expose their
