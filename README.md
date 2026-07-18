@@ -122,6 +122,55 @@ Caller triggers on `issues: labeled`.
 - `token` needs write access to both the source and destination
   repositories; StarCast stores no consumer secrets.
 
+### `pull-issue-shared.yml`
+
+Pulls open issues from a configured set of organizations and/or individual
+repositories into a GitHub Project V2, idempotently — the hub-side
+counterpart to `intake-issue-shared.yml`. Instead of every donor repo
+configuring its own caller workflow and token (the push model above), one
+workflow here is configured once and periodically discovers whatever open
+issues currently exist in scope. Donor repos need zero configuration.
+
+```yaml
+jobs:
+  pull:
+    uses: rubykatzen/starcast/.github/workflows/pull-issue-shared.yml@v0.2
+    with:
+      organizations: dupmachine,rubykatzen   # every repo in each org is in scope
+      repos: some-owner/some-repo             # individual repos, comma-separated
+      project_owner: dupmachine
+      project_number: 4
+      initial_status: Incoming
+    secrets:
+      token: ${{ secrets.PULL_TOKEN }}
+```
+
+Caller drives cadence from its own `on: schedule` (same reason as
+`intake-issue-shared.yml`'s reconcile sweep — a `schedule` trigger can't
+live inside a reusable workflow) plus `workflow_dispatch` for manual runs.
+At least one of `organizations`/`repos` must be set.
+
+- **Discovery is one search call**, not one query per configured org/repo:
+  `search` ORs multiple `org:`/`repo:` qualifiers together, so cost stays
+  low regardless of how large the configured scope is.
+- **No content filter yet** — every open issue found in scope is pulled.
+  Label- or type-based filtering is a natural addition once a real need
+  shows up.
+- **Idempotent, including archived items** — same guarantees as
+  `intake-issue-shared.yml`: an issue already linked to the project is
+  never re-added, never unarchived, and a real Status value is never
+  overwritten.
+- `token` needs read access across every configured organization/repo plus
+  write access to the Project — a broader, more centralized credential
+  than the push model's per-repo Project-only token. That's the direct
+  trade-off for not configuring anything on the donor side.
+- **1,000-result ceiling**: GitHub's search API only ever returns the
+  first 1,000 matching issues, however many pages you walk — verified
+  directly (a real query reported `issueCount: 1093` but the connection
+  yielded exactly 1000 nodes). No error, no warning. Not a concern at
+  small scale, but a real ceiling if the configured scope's total open
+  issue count grows past it.
+
 ## Workflow API
 
 Reusable workflows live directly in `.github/workflows/` and expose their

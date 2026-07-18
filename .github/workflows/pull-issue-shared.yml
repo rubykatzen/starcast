@@ -1,0 +1,51 @@
+name: Pull Issue
+on:
+  workflow_call:
+    inputs:
+      organizations:
+        description: 'Comma-separated org logins; every repo in each is in scope (e.g. "dupmachine,rubykatzen")'
+        required: false
+        type: string
+        default: ''
+      repos:
+        description: 'Comma-separated "owner/repo" entries'
+        required: false
+        type: string
+        default: ''
+      project_owner:
+        description: 'Org login that owns the target Project'
+        required: true
+        type: string
+      project_number:
+        description: 'Numeric Project V2 number'
+        required: true
+        type: number
+      initial_status:
+        description: 'Status option to set on newly added items (e.g. Incoming)'
+        required: true
+        type: string
+      status_field:
+        description: 'Name of the single-select Status field'
+        required: false
+        type: string
+        default: 'Status'
+    secrets:
+      token:
+        description: 'Token with read access to the configured organizations/repos and write access to the Project'
+        required: true
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      # TODO: pin to a floating tag (matching intake-issue-shared.yml's own
+      # history) once a release exists that includes actions/pull-issue.
+      # @v0.2 currently predates this action entirely.
+      - uses: rubykatzen/starcast/actions/pull-issue@main
+        with:
+          organizations: ${{ inputs.organizations }}
+          repos: ${{ inputs.repos }}
+          project_owner: ${{ inputs.project_owner }}
+          project_number: ${{ inputs.project_number }}
+          status_field: ${{ inputs.status_field }}
+          initial_status: ${{ inputs.initial_status }}
+          github_token: ${{ secrets.token }}

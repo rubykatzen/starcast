@@ -1,0 +1,40 @@
+name: 'Pull Issue'
+description: 'Pull open issues from configured organizations/repos into a GitHub Project V2, idempotently'
+inputs:
+  organizations:
+    description: 'Comma-separated org logins; every repo in each is in scope'
+    required: false
+    default: ''
+  repos:
+    description: 'Comma-separated "owner/repo" entries'
+    required: false
+    default: ''
+  project_owner:
+    description: 'Org login that owns the target Project'
+    required: true
+  project_number:
+    description: 'Numeric Project V2 number'
+    required: true
+  initial_status:
+    description: 'Status option to set on newly added items'
+    required: true
+  status_field:
+    description: 'Name of the single-select Status field'
+    required: false
+    default: 'Status'
+  github_token:
+    description: 'Token with read access to the configured organizations/repos and write access to the Project'
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        PROJECT_OWNER: ${{ inputs.project_owner }}
+        PROJECT_NUMBER: ${{ inputs.project_number }}
+        STATUS_FIELD: ${{ inputs.status_field }}
+        INITIAL_STATUS: ${{ inputs.initial_status }}
+        ORGANIZATIONS: ${{ inputs.organizations }}
+        REPOS: ${{ inputs.repos }}
+      run: python3 "$GITHUB_ACTION_PATH/pull_issue.py"
