@@ -28,10 +28,7 @@ jobs:
   pull:
     runs-on: ubuntu-latest
     steps:
-      # TODO: pin to a floating tag (matching intake-issue-shared.yml's own
-      # history) once a release exists that includes actions/pull-issue.
-      # @v0.2 currently predates this action entirely.
-      - uses: rubykatzen/starcast/actions/pull-issue@main
+      - uses: rubykatzen/starcast/actions/pull-issue@v0.3
         with:
           organizations: ${{ inputs.organizations }}
           repos: ${{ inputs.repos }}

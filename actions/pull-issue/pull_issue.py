@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Pull open issues from a set of organizations/repos into a GitHub Project V2.
 
-This is the hub-side counterpart to actions/intake-issue: instead of every
-donor repo configuring its own caller workflow and token (the push model),
-one workflow here is configured once with a scope (organizations and/or
-individual repos) and periodically discovers and pulls in whatever open
-issues currently exist there. Donor repos need zero configuration.
+One workflow is configured centrally with a scope (organizations and/or
+individual repositories) and periodically discovers and pulls in whatever
+open issues currently exist there. Donor repositories need zero
+configuration.
 
 Organizations are expanded to their repositories first, then combined
 with the explicitly configured repositories and deduplicated. Each
@@ -13,13 +12,9 @@ repository is processed independently: its complete `issues(states: OPEN)`
 connection is compared with Project items filtered to that repository.
 Using repository connections avoids GitHub Search's 1,000-result ceiling.
 
-Everything below the discovery step follows actions/intake-issue's
-idempotency rules: membership is checked before any mutation, and archived
-items never reach the add mutation because it would unarchive them. Status
-is deliberately left to the target Project's automation. The GraphQL helper
-and resolve_project/add_item are duplicated here rather than imported from
-that action because composite actions have no shared import path in this
-repo.
+Membership is checked before any mutation, and archived items never reach
+the add mutation because it would unarchive them. Status is deliberately
+left to the target Project's automation.
 """
 
 import json
