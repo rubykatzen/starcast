@@ -29,16 +29,16 @@ commit SHA. Do not recommend `@main` for stable consumers.
 
 - `route-issue-shared.yml` transfers an issue according to an explicit label
   routing map.
-- `pull-issue-shared.yml` expands configured organizations to repositories,
+- `collect-issues-shared.yml` expands configured organizations to repositories,
   combines them with explicit repositories, and processes each unique
   repository independently. It paginates open issues directly and does not use
   GitHub Search. It adds only issues missing from the target Project, treats
   archived Project items as already present, and leaves Status assignment to
   Project automation. Its `organizations` and `repositories` inputs are JSON
   string arrays.
-- `pull-pr-shared.yml` follows the same repository discovery and Project
-  membership rules for open pull requests, including drafts. Fork pull
-  requests are scoped by their base repository.
+- `collect-pull-requests-shared.yml` follows the same repository discovery and
+  Project membership rules for open pull requests, including drafts. Fork
+  pull requests are scoped by their base repository.
 
 ## Engineering rules
 

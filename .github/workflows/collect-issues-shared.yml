@@ -1,4 +1,4 @@
-name: Pull PR
+name: Collect Issues
 on:
   workflow_call:
     inputs:
@@ -25,10 +25,10 @@ on:
         description: 'Token with read access to the configured organizations/repositories and write access to the Project'
         required: true
 jobs:
-  pull:
+  collect:
     runs-on: ubuntu-latest
     steps:
-      - uses: rubykatzen/starcast/actions/pull-pr@v0.5
+      - uses: rubykatzen/starcast/actions/collect-issues@v0.5
         with:
           organizations: ${{ inputs.organizations }}
           repositories: ${{ inputs.repositories }}

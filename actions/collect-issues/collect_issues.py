@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Pull open issues from a set of organizations/repos into a GitHub Project V2.
+"""Collect open issues from organizations/repos into a GitHub Project V2.
 
 One workflow is configured centrally with a scope (organizations and/or
-individual repositories) and periodically discovers and pulls in whatever
+individual repositories) and periodically discovers and collects whatever
 open issues currently exist there. Donor repositories need zero
 configuration.
 
@@ -263,7 +263,7 @@ def main() -> None:
             added.append(label)
 
     summary = (
-        f"### pull-issue: {', '.join(organizations + configured_repositories)} "
+        f"### collect-issues: {', '.join(organizations + configured_repositories)} "
         f"-> {project_owner}/#{project_number}\n\n"
         f"- Added: {added or 'none'}\n"
         f"- Already present (untouched): {skipped_present or 'none'}\n"

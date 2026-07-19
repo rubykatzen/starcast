@@ -1,5 +1,5 @@
-name: 'Pull PR'
-description: 'Pull open pull requests from configured organizations/repositories into a GitHub Project V2, idempotently'
+name: 'Collect Issues'
+description: 'Collect open issues from configured organizations/repositories into a GitHub Project V2, idempotently'
 inputs:
   organizations:
     description: 'JSON array of org logins; every repository in each organization is included'
@@ -28,4 +28,4 @@ runs:
         PROJECT_NUMBER: ${{ inputs.project_number }}
         ORGANIZATIONS: ${{ inputs.organizations }}
         REPOSITORIES: ${{ inputs.repositories }}
-      run: python3 "$GITHUB_ACTION_PATH/pull_pr.py"
+      run: python3 "$GITHUB_ACTION_PATH/collect_issues.py"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pull open pull requests into a GitHub Project V2.
+"""Collect open pull requests into a GitHub Project V2.
 
 Organizations are expanded to their repositories, combined with explicitly
 configured repositories, and deduplicated. Each repository is processed
@@ -255,7 +255,7 @@ def main() -> None:
             added.append(label)
 
     summary = (
-        f"### pull-pr: {', '.join(organizations + configured_repositories)} "
+        f"### collect-pull-requests: {', '.join(organizations + configured_repositories)} "
         f"-> {project_owner}/#{project_number}\n\n"
         f"- Added: {added or 'none'}\n"
         f"- Already present (untouched): {skipped_present or 'none'}\n"

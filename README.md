@@ -77,17 +77,17 @@ Caller triggers on `issues: labeled`.
 - `token` needs write access to both the source and destination
   repositories; StarCast stores no consumer secrets.
 
-### `pull-issue-shared.yml`
+### `collect-issues-shared.yml`
 
-Pulls open issues from a configured set of organizations and/or individual
+Collects open issues from a configured set of organizations and/or individual
 repositories into a GitHub Project V2, idempotently. One workflow is configured
 centrally and periodically discovers whatever open issues currently exist in
 scope. Donor repositories need zero configuration.
 
 ```yaml
 jobs:
-  pull:
-    uses: rubykatzen/starcast/.github/workflows/pull-issue-shared.yml@v0.5
+  collect:
+    uses: rubykatzen/starcast/.github/workflows/collect-issues-shared.yml@v0.5
     with:
       organizations: >-
         [
@@ -101,7 +101,7 @@ jobs:
       project_owner: some-org
       project_number: 4
     secrets:
-      token: ${{ secrets.PULL_TOKEN }}
+      token: ${{ secrets.COLLECT_TOKEN }}
 ```
 
 Caller drives cadence from its own `on: schedule`, because a `schedule`
@@ -112,7 +112,7 @@ manual runs. At least one organization or repository must be configured.
   their repositories, combined with explicitly configured repositories, and
   deduplicated. Each repository's complete open-issues connection is then
   processed independently.
-- **No content filter yet** — every open issue found in scope is pulled.
+- **No content filter yet** — every open issue found in scope is collected.
   Label- or type-based filtering is a natural addition once a real need
   shows up.
 - **Idempotent, including archived items** — an issue already linked to the
@@ -123,16 +123,16 @@ manual runs. At least one organization or repository must be configured.
 - `token` needs read access across every configured organization/repo plus
   write access to the Project. StarCast stores no consumer secrets.
 
-### `pull-pr-shared.yml`
+### `collect-pull-requests-shared.yml`
 
-Pulls open pull requests from configured organizations and/or repositories
+Collects open pull requests from configured organizations and/or repositories
 into a GitHub Project V2. Pull requests opened from forks belong to their base
 repository for source matching. Draft pull requests are included.
 
 ```yaml
 jobs:
-  pull:
-    uses: rubykatzen/starcast/.github/workflows/pull-pr-shared.yml@v0.5
+  collect:
+    uses: rubykatzen/starcast/.github/workflows/collect-pull-requests-shared.yml@v0.5
     with:
       organizations: >-
         [
@@ -145,7 +145,7 @@ jobs:
       project_owner: some-org
       project_number: 4
     secrets:
-      token: ${{ secrets.PULL_TOKEN }}
+      token: ${{ secrets.COLLECT_TOKEN }}
 ```
 
 The caller owns the `on: schedule` and optional `workflow_dispatch` triggers.
