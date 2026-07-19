@@ -151,42 +151,23 @@ def deduplicate(values: list[str]) -> list[str]:
     return unique
 
 
-def parse_scope(raw_scope: str) -> tuple[list[str], list[str]]:
-    """Validate and return organizations and repositories from a JSON scope."""
+def parse_json_array(raw_value: str, input_name: str) -> list[str]:
+    """Validate and return one JSON-array action input."""
     try:
-        scope = json.loads(raw_scope)
+        values = json.loads(raw_value)
     except json.JSONDecodeError as error:
-        print(f"ERROR: 'scope' must be valid JSON: {error.msg}", file=sys.stderr)
+        print(f"ERROR: '{input_name}' must be valid JSON: {error.msg}", file=sys.stderr)
         sys.exit(1)
 
-    if not isinstance(scope, dict):
-        print("ERROR: 'scope' must be a JSON object", file=sys.stderr)
+    if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+        print(f"ERROR: '{input_name}' must be a JSON array of strings", file=sys.stderr)
         sys.exit(1)
 
-    allowed_keys = {"organizations", "repositories"}
-    unknown_keys = sorted(set(scope) - allowed_keys)
-    if unknown_keys:
-        print(f"ERROR: 'scope' has unknown keys: {', '.join(unknown_keys)}", file=sys.stderr)
+    values = [value.strip() for value in values]
+    if any(not value for value in values):
+        print(f"ERROR: '{input_name}' must not contain empty strings", file=sys.stderr)
         sys.exit(1)
-
-    parsed = {}
-    for key in sorted(allowed_keys):
-        values = scope.get(key, [])
-        if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
-            print(f"ERROR: 'scope.{key}' must be an array of strings", file=sys.stderr)
-            sys.exit(1)
-        values = [value.strip() for value in values]
-        if any(not value for value in values):
-            print(f"ERROR: 'scope.{key}' must not contain empty strings", file=sys.stderr)
-            sys.exit(1)
-        parsed[key] = deduplicate(values)
-
-    organizations = parsed["organizations"]
-    repositories = parsed["repositories"]
-    if not organizations and not repositories:
-        print("ERROR: 'scope' must contain at least one organization or repository", file=sys.stderr)
-        sys.exit(1)
-    return organizations, repositories
+    return deduplicate(values)
 
 
 def fetch_project_items_for_repo(project_owner: str, project_number: int, repo: str) -> dict[str, dict]:
@@ -244,7 +225,13 @@ def add_item(project_id: str, issue_node_id: str) -> None:
 def main() -> None:
     project_owner = os.environ["PROJECT_OWNER"]
     project_number = int(os.environ["PROJECT_NUMBER"])
-    organizations, configured_repositories = parse_scope(os.environ["SCOPE"])
+    organizations = parse_json_array(os.environ.get("ORGANIZATIONS", "[]"), "organizations")
+    configured_repositories = parse_json_array(
+        os.environ.get("REPOSITORIES", "[]"), "repositories"
+    )
+    if not organizations and not configured_repositories:
+        print("ERROR: at least one organization or repository must be configured", file=sys.stderr)
+        sys.exit(1)
 
     project_id = resolve_project(project_owner, project_number)
 

@@ -5,8 +5,8 @@
 ### Changed
 
 - **Breaking:** `pull-issue-shared.yml` and `actions/pull-issue` replace the
-  comma-separated `organizations` and `repos` inputs with one JSON `scope`
-  object containing `organizations` and `repositories` arrays.
+  comma-separated `organizations` and `repos` inputs with JSON-array
+  `organizations` and `repositories` inputs.
 
 ## [v0.3.1] - 2026-07-19
 

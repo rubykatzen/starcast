@@ -2,10 +2,16 @@ name: Pull Issue
 on:
   workflow_call:
     inputs:
-      scope:
-        description: 'JSON object with "organizations" and "repositories" string arrays'
-        required: true
+      organizations:
+        description: 'JSON array of org logins; every repository in each organization is included'
+        required: false
         type: string
+        default: '[]'
+      repositories:
+        description: 'JSON array of "owner/repo" entries'
+        required: false
+        type: string
+        default: '[]'
       project_owner:
         description: 'Org login that owns the target Project'
         required: true
@@ -16,7 +22,7 @@ on:
         type: number
     secrets:
       token:
-        description: 'Token with read access to the configured scope and write access to the Project'
+        description: 'Token with read access to the configured organizations/repositories and write access to the Project'
         required: true
 jobs:
   pull:
@@ -24,7 +30,8 @@ jobs:
     steps:
       - uses: rubykatzen/starcast/actions/pull-issue@v0.4
         with:
-          scope: ${{ inputs.scope }}
+          organizations: ${{ inputs.organizations }}
+          repositories: ${{ inputs.repositories }}
           project_owner: ${{ inputs.project_owner }}
           project_number: ${{ inputs.project_number }}
           github_token: ${{ secrets.token }}

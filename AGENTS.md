@@ -34,8 +34,8 @@ commit SHA. Do not recommend `@main` for stable consumers.
   repository independently. It paginates open issues directly and does not use
   GitHub Search. It adds only issues missing from the target Project, treats
   archived Project items as already present, and leaves Status assignment to
-  Project automation. Its `scope` input is a JSON object containing
-  `organizations` and `repositories` string arrays.
+  Project automation. Its `organizations` and `repositories` inputs are JSON
+  string arrays.
 
 ## Engineering rules
 

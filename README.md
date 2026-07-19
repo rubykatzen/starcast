@@ -89,11 +89,15 @@ jobs:
   pull:
     uses: rubykatzen/starcast/.github/workflows/pull-issue-shared.yml@v0.4
     with:
-      scope: >-
-        {
-          "organizations": ["dupmachine", "rubykatzen"],
-          "repositories": ["some-owner/some-repo"]
-        }
+      organizations: >-
+        [
+          "dupmachine",
+          "rubykatzen"
+        ]
+      repositories: >-
+        [
+          "some-owner/some-repo"
+        ]
       project_owner: dupmachine
       project_number: 4
     secrets:
@@ -102,7 +106,7 @@ jobs:
 
 Caller drives cadence from its own `on: schedule`, because a `schedule`
 trigger cannot live inside a reusable workflow, plus `workflow_dispatch` for
-manual runs. `scope` must contain at least one organization or repository.
+manual runs. At least one organization or repository must be configured.
 
 - **Repository-based discovery** — configured organizations are expanded to
   their repositories, combined with explicitly configured repositories, and

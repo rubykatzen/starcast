@@ -1,9 +1,14 @@
 name: 'Pull Issue'
-description: 'Pull open issues from a configured JSON scope into a GitHub Project V2, idempotently'
+description: 'Pull open issues from configured organizations/repositories into a GitHub Project V2, idempotently'
 inputs:
-  scope:
-    description: 'JSON object with "organizations" and "repositories" string arrays'
-    required: true
+  organizations:
+    description: 'JSON array of org logins; every repository in each organization is included'
+    required: false
+    default: '[]'
+  repositories:
+    description: 'JSON array of "owner/repo" entries'
+    required: false
+    default: '[]'
   project_owner:
     description: 'Org login that owns the target Project'
     required: true
@@ -11,7 +16,7 @@ inputs:
     description: 'Numeric Project V2 number'
     required: true
   github_token:
-    description: 'Token with read access to the configured scope and write access to the Project'
+    description: 'Token with read access to the configured organizations/repositories and write access to the Project'
     required: true
 runs:
   using: composite
@@ -21,5 +26,6 @@ runs:
         GH_TOKEN: ${{ inputs.github_token }}
         PROJECT_OWNER: ${{ inputs.project_owner }}
         PROJECT_NUMBER: ${{ inputs.project_number }}
-        SCOPE: ${{ inputs.scope }}
+        ORGANIZATIONS: ${{ inputs.organizations }}
+        REPOSITORIES: ${{ inputs.repositories }}
       run: python3 "$GITHUB_ACTION_PATH/pull_issue.py"
