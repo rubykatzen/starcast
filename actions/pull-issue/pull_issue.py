@@ -139,16 +139,54 @@ def fetch_open_issues(repo: str) -> list[dict]:
     return issues
 
 
-def deduplicate_repositories(repositories: list[str]) -> list[str]:
-    """Deduplicate GitHub repository names case-insensitively, preserving order."""
+def deduplicate(values: list[str]) -> list[str]:
+    """Deduplicate GitHub names case-insensitively, preserving order."""
     unique = []
     seen = set()
-    for repo in repositories:
-        key = repo.casefold()
+    for value in values:
+        key = value.casefold()
         if key not in seen:
             seen.add(key)
-            unique.append(repo)
+            unique.append(value)
     return unique
+
+
+def parse_scope(raw_scope: str) -> tuple[list[str], list[str]]:
+    """Validate and return organizations and repositories from a JSON scope."""
+    try:
+        scope = json.loads(raw_scope)
+    except json.JSONDecodeError as error:
+        print(f"ERROR: 'scope' must be valid JSON: {error.msg}", file=sys.stderr)
+        sys.exit(1)
+
+    if not isinstance(scope, dict):
+        print("ERROR: 'scope' must be a JSON object", file=sys.stderr)
+        sys.exit(1)
+
+    allowed_keys = {"organizations", "repositories"}
+    unknown_keys = sorted(set(scope) - allowed_keys)
+    if unknown_keys:
+        print(f"ERROR: 'scope' has unknown keys: {', '.join(unknown_keys)}", file=sys.stderr)
+        sys.exit(1)
+
+    parsed = {}
+    for key in sorted(allowed_keys):
+        values = scope.get(key, [])
+        if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+            print(f"ERROR: 'scope.{key}' must be an array of strings", file=sys.stderr)
+            sys.exit(1)
+        values = [value.strip() for value in values]
+        if any(not value for value in values):
+            print(f"ERROR: 'scope.{key}' must not contain empty strings", file=sys.stderr)
+            sys.exit(1)
+        parsed[key] = deduplicate(values)
+
+    organizations = parsed["organizations"]
+    repositories = parsed["repositories"]
+    if not organizations and not repositories:
+        print("ERROR: 'scope' must contain at least one organization or repository", file=sys.stderr)
+        sys.exit(1)
+    return organizations, repositories
 
 
 def fetch_project_items_for_repo(project_owner: str, project_number: int, repo: str) -> dict[str, dict]:
@@ -206,19 +244,14 @@ def add_item(project_id: str, issue_node_id: str) -> None:
 def main() -> None:
     project_owner = os.environ["PROJECT_OWNER"]
     project_number = int(os.environ["PROJECT_NUMBER"])
-    organizations = [o.strip() for o in os.environ.get("ORGANIZATIONS", "").split(",") if o.strip()]
-    repos = [r.strip() for r in os.environ.get("REPOS", "").split(",") if r.strip()]
-
-    if not organizations and not repos:
-        print("ERROR: at least one of 'organizations' or 'repos' must be set", file=sys.stderr)
-        sys.exit(1)
+    organizations, configured_repositories = parse_scope(os.environ["SCOPE"])
 
     project_id = resolve_project(project_owner, project_number)
 
-    repositories = list(repos)
+    repositories = list(configured_repositories)
     for organization in organizations:
         repositories += fetch_organization_repositories(organization)
-    repositories = deduplicate_repositories(repositories)
+    repositories = deduplicate(repositories)
 
     added, skipped_present, skipped_archived = [], [], []
     for repo in repositories:
@@ -243,7 +276,8 @@ def main() -> None:
             added.append(label)
 
     summary = (
-        f"### pull-issue: {', '.join(organizations + repos)} -> {project_owner}/#{project_number}\n\n"
+        f"### pull-issue: {', '.join(organizations + configured_repositories)} "
+        f"-> {project_owner}/#{project_number}\n\n"
         f"- Added: {added or 'none'}\n"
         f"- Already present (untouched): {skipped_present or 'none'}\n"
         f"- Already present, archived (untouched): {skipped_archived or 'none'}\n"

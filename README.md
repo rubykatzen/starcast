@@ -45,9 +45,13 @@ applied, idempotently.
 ```yaml
 jobs:
   route:
-    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.3
+    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.4
     with:
-      routes: '{"Household": "dupmachine/ground-control", "Meds": "dupmachine/meds"}'
+      routes: >-
+        {
+          "Household": "dupmachine/ground-control",
+          "Meds": "dupmachine/meds"
+        }
       label_name: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number }}
       create_labels_if_missing: false
@@ -83,10 +87,13 @@ scope. Donor repositories need zero configuration.
 ```yaml
 jobs:
   pull:
-    uses: rubykatzen/starcast/.github/workflows/pull-issue-shared.yml@v0.3
+    uses: rubykatzen/starcast/.github/workflows/pull-issue-shared.yml@v0.4
     with:
-      organizations: dupmachine, rubykatzen   # every repo in each org is in scope
-      repos: some-owner/some-repo             # individual repos, comma-separated
+      scope: >-
+        {
+          "organizations": ["dupmachine", "rubykatzen"],
+          "repositories": ["some-owner/some-repo"]
+        }
       project_owner: dupmachine
       project_number: 4
     secrets:
@@ -95,7 +102,7 @@ jobs:
 
 Caller drives cadence from its own `on: schedule`, because a `schedule`
 trigger cannot live inside a reusable workflow, plus `workflow_dispatch` for
-manual runs. At least one of `organizations`/`repos` must be set.
+manual runs. `scope` must contain at least one organization or repository.
 
 - **Repository-based discovery** — configured organizations are expanded to
   their repositories, combined with explicitly configured repositories, and
@@ -117,7 +124,7 @@ manual runs. At least one of `organizations`/`repos` must be set.
 Reusable workflows live directly in `.github/workflows/` and expose their
 contract through `workflow_call` inputs, secrets, permissions, and outputs.
 
-Consumers should reference a released version — currently `v0.3`, the
+Consumers should reference a released version — currently `v0.4`, the
 floating minor line (matching the convention `rubykatzen/baseline` and
 `rubykatzen/releaser` already use for their own pre-1.0 floating tags,
 e.g. `@v0.7`; SemVer treats `0.x` releases as initial development, where
@@ -127,7 +134,7 @@ major is the closer equivalent to a stable version pin until `v1` ships):
 ```yaml
 jobs:
   example:
-    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.3
+    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.4
 ```
 
 Pinning an immutable commit SHA provides the strongest supply-chain guarantee.
