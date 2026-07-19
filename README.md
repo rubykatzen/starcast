@@ -85,7 +85,7 @@ jobs:
   pull:
     uses: rubykatzen/starcast/.github/workflows/pull-issue-shared.yml@v0.3
     with:
-      organizations: dupmachine,rubykatzen   # every repo in each org is in scope
+      organizations: dupmachine, rubykatzen   # every repo in each org is in scope
       repos: some-owner/some-repo             # individual repos, comma-separated
       project_owner: dupmachine
       project_number: 4
