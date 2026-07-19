@@ -49,8 +49,8 @@ jobs:
     with:
       routes: >-
         {
-          "Household": "dupmachine/ground-control",
-          "Meds": "dupmachine/meds"
+          "Household": "some-org/some-repo",
+          "Meds": "another-org/another-repo"
         }
       label_name: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number }}
@@ -91,14 +91,14 @@ jobs:
     with:
       organizations: >-
         [
-          "dupmachine",
-          "rubykatzen"
+          "some-org",
+          "another-org"
         ]
       repositories: >-
         [
-          "some-owner/some-repo"
+          "some-org/some-repo"
         ]
-      project_owner: dupmachine
+      project_owner: some-org
       project_number: 4
     secrets:
       token: ${{ secrets.PULL_TOKEN }}
