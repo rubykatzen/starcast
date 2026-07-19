@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.5.0] - 2026-07-19
+
 ### Added
 
 - `collect-pull-requests-shared.yml` reusable workflow and
