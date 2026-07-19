@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- `pull-pr-shared.yml` reusable workflow and `actions/pull-pr` composite
+  action: pull open pull requests, including drafts, from configured
+  organizations/repositories into a GitHub Project V2. Existing active and
+  archived Project items are left untouched, and Status is owned by Project
+  automation.
+
 ## [v0.4.0] - 2026-07-19
 
 ### Changed

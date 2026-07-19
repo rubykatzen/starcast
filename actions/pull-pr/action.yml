@@ -1,0 +1,31 @@
+name: 'Pull PR'
+description: 'Pull open pull requests from configured organizations/repositories into a GitHub Project V2, idempotently'
+inputs:
+  organizations:
+    description: 'JSON array of org logins; every repository in each organization is included'
+    required: false
+    default: '[]'
+  repositories:
+    description: 'JSON array of "owner/repo" entries'
+    required: false
+    default: '[]'
+  project_owner:
+    description: 'Org login that owns the target Project'
+    required: true
+  project_number:
+    description: 'Numeric Project V2 number'
+    required: true
+  github_token:
+    description: 'Token with read access to the configured organizations/repositories and write access to the Project'
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        PROJECT_OWNER: ${{ inputs.project_owner }}
+        PROJECT_NUMBER: ${{ inputs.project_number }}
+        ORGANIZATIONS: ${{ inputs.organizations }}
+        REPOSITORIES: ${{ inputs.repositories }}
+      run: python3 "$GITHUB_ACTION_PATH/pull_pr.py"

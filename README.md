@@ -32,8 +32,8 @@ The repository is being rebuilt around this model. The previous autonomous
 editorial pipeline implementation has been removed and is not supported. Its
 history remains available in Git.
 
-The current reusable workflows cover centralized Project intake and explicit
-label-based issue routing.
+The current reusable workflows cover centralized Project intake for issues and
+pull requests, plus explicit label-based issue routing.
 
 ## Reusable workflows
 
@@ -45,7 +45,7 @@ applied, idempotently.
 ```yaml
 jobs:
   route:
-    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.4
+    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.5
     with:
       routes: >-
         {
@@ -87,7 +87,7 @@ scope. Donor repositories need zero configuration.
 ```yaml
 jobs:
   pull:
-    uses: rubykatzen/starcast/.github/workflows/pull-issue-shared.yml@v0.4
+    uses: rubykatzen/starcast/.github/workflows/pull-issue-shared.yml@v0.5
     with:
       organizations: >-
         [
@@ -123,12 +123,51 @@ manual runs. At least one organization or repository must be configured.
 - `token` needs read access across every configured organization/repo plus
   write access to the Project. StarCast stores no consumer secrets.
 
+### `pull-pr-shared.yml`
+
+Pulls open pull requests from configured organizations and/or repositories
+into a GitHub Project V2. Pull requests opened from forks belong to their base
+repository for source matching. Draft pull requests are included.
+
+```yaml
+jobs:
+  pull:
+    uses: rubykatzen/starcast/.github/workflows/pull-pr-shared.yml@v0.5
+    with:
+      organizations: >-
+        [
+          "some-org"
+        ]
+      repositories: >-
+        [
+          "some-org/some-repo"
+        ]
+      project_owner: some-org
+      project_number: 4
+    secrets:
+      token: ${{ secrets.PULL_TOKEN }}
+```
+
+The caller owns the `on: schedule` and optional `workflow_dispatch` triggers.
+At least one organization or repository must be configured.
+
+- **All open pull requests** — drafts and ready-for-review pull requests are
+  both included; merged and closed pull requests are not added.
+- **Repository-based discovery** — organizations are expanded to repositories,
+  then every repository's complete open pull-request connection is paginated.
+- **Idempotent, including archived items** — a pull request already linked to
+  the Project is never re-added or unarchived.
+- **Status is owned by Project automation** — the workflow only adds the pull
+  request and does not mutate Project fields.
+- `token` needs read access across every configured organization/repository
+  plus write access to the Project.
+
 ## Workflow API
 
 Reusable workflows live directly in `.github/workflows/` and expose their
 contract through `workflow_call` inputs, secrets, permissions, and outputs.
 
-Consumers should reference a released version — currently `v0.4`, the
+Consumers should reference a released version — currently `v0.5`, the
 floating minor line (matching the convention `rubykatzen/baseline` and
 `rubykatzen/releaser` already use for their own pre-1.0 floating tags,
 e.g. `@v0.7`; SemVer treats `0.x` releases as initial development, where
@@ -138,7 +177,7 @@ major is the closer equivalent to a stable version pin until `v1` ships):
 ```yaml
 jobs:
   example:
-    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.4
+    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.5
 ```
 
 Pinning an immutable commit SHA provides the strongest supply-chain guarantee.
