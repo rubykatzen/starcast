@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Removed
+
+- `intake-issue-shared.yml` reusable workflow and `actions/intake-issue`
+  composite action. Use `pull-issue-shared.yml` for centralized repository or
+  organization intake.
+
 ## [v0.3.0] - 2026-07-18
 
 ### Added

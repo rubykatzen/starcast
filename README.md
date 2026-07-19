@@ -32,59 +32,10 @@ The repository is being rebuilt around this model. The previous autonomous
 editorial pipeline implementation has been removed and is not supported. Its
 history remains available in Git.
 
-The first published reusable workflow, `intake-issue-shared.yml`, places issues into
-a Project and sets an initial Status — the entry point for the
-cross-repository clarification process.
+The current reusable workflows cover centralized Project intake and explicit
+label-based issue routing.
 
 ## Reusable workflows
-
-### `intake-issue-shared.yml`
-
-Adds issues to a GitHub Project V2 and sets a Status field, idempotently.
-
-```yaml
-jobs:
-  intake:
-    uses: rubykatzen/starcast/.github/workflows/intake-issue-shared.yml@v0.2
-    with:
-      project_owner: my-org
-      project_number: 4
-      initial_status: Incoming
-      issue_number: ${{ github.event.issue.number }}  # omit to reconcile every open issue
-      issue_types: Task,Bug                            # omit to accept every type
-    secrets:
-      project_token: ${{ secrets.PROJECT_TOKEN }}
-```
-
-- **Event-driven intake**: pass `issue_number` from an `issues: opened`
-  caller to add exactly that issue.
-- **Reconcile sweep**: omit `issue_number` to scan every open issue in the
-  calling repository and add whichever are missing — a recovery path for
-  missed webhook deliveries or failed runs. Callers drive this from their own
-  `on: schedule` (a `schedule` trigger only fires for the repository that
-  owns the workflow file, so it cannot live inside a reusable workflow) plus
-  `workflow_dispatch` for manual runs. There's no built-in default interval —
-  measured GraphQL cost is a few points per run (well under the 5,000/hour
-  budget), so the choice isn't about load; it's about how much staleness
-  before recovery is acceptable. `rubykatzen/starcast` itself runs every 2
-  hours (`0 */2 * * *`) as a reasonable starting point.
-- **Idempotent, including archived items**: an issue already linked to the
-  target project — whether its Project item is archived or not — is left
-  untouched. It is never unarchived, never re-added, and this is never an
-  error.
-- **Type filtering**: `issue_types` matches against GitHub's native Issue
-  Type field (`issue.issueType.name`), not labels.
-- `project_token` needs write access to the calling repository's issues and
-  to Projects owned by `project_owner`; StarCast stores no consumer secrets.
-  It can't be named `github_token` — GitHub reserves that name in
-  `workflow_call`'s `secrets:` block because it collides with the built-in
-  `GITHUB_TOKEN`.
-
-This repository is itself a consumer: `intake-issue-clarification.yml` routes issues
-opened in `rubykatzen/starcast` into the shared `dupmachine/Clarification`
-Project, combining event-driven intake and the scheduled reconcile sweep in
-one caller (one `with:` block, so config and future filters only need to be
-set in one place instead of kept in sync across two files).
 
 ### `route-issue-shared.yml`
 
@@ -94,7 +45,7 @@ applied, idempotently.
 ```yaml
 jobs:
   route:
-    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.2
+    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.3
     with:
       routes: '{"Household": "dupmachine/ground-control", "Meds": "dupmachine/meds"}'
       label_name: ${{ github.event.label.name }}
@@ -125,16 +76,14 @@ Caller triggers on `issues: labeled`.
 ### `pull-issue-shared.yml`
 
 Pulls open issues from a configured set of organizations and/or individual
-repositories into a GitHub Project V2, idempotently — the hub-side
-counterpart to `intake-issue-shared.yml`. Instead of every donor repo
-configuring its own caller workflow and token (the push model above), one
-workflow here is configured once and periodically discovers whatever open
-issues currently exist in scope. Donor repos need zero configuration.
+repositories into a GitHub Project V2, idempotently. One workflow is configured
+centrally and periodically discovers whatever open issues currently exist in
+scope. Donor repositories need zero configuration.
 
 ```yaml
 jobs:
   pull:
-    uses: rubykatzen/starcast/.github/workflows/pull-issue-shared.yml@v0.2
+    uses: rubykatzen/starcast/.github/workflows/pull-issue-shared.yml@v0.3
     with:
       organizations: dupmachine,rubykatzen   # every repo in each org is in scope
       repos: some-owner/some-repo             # individual repos, comma-separated
@@ -144,10 +93,9 @@ jobs:
       token: ${{ secrets.PULL_TOKEN }}
 ```
 
-Caller drives cadence from its own `on: schedule` (same reason as
-`intake-issue-shared.yml`'s reconcile sweep — a `schedule` trigger can't
-live inside a reusable workflow) plus `workflow_dispatch` for manual runs.
-At least one of `organizations`/`repos` must be set.
+Caller drives cadence from its own `on: schedule`, because a `schedule`
+trigger cannot live inside a reusable workflow, plus `workflow_dispatch` for
+manual runs. At least one of `organizations`/`repos` must be set.
 
 - **Repository-based discovery** — configured organizations are expanded to
   their repositories, combined with explicitly configured repositories, and
@@ -156,23 +104,20 @@ At least one of `organizations`/`repos` must be set.
 - **No content filter yet** — every open issue found in scope is pulled.
   Label- or type-based filtering is a natural addition once a real need
   shows up.
-- **Idempotent, including archived items** — same guarantees as
-  `intake-issue-shared.yml`: an issue already linked to the project is
-  never re-added or unarchived.
+- **Idempotent, including archived items** — an issue already linked to the
+  project is never re-added or unarchived.
 - **Status is owned by Project automation** — this workflow only adds the
   issue; configure the target Project's `Item added to project` automation
   to assign the desired initial Status.
 - `token` needs read access across every configured organization/repo plus
-  write access to the Project — a broader, more centralized credential
-  than the push model's per-repo Project-only token. That's the direct
-  trade-off for not configuring anything on the donor side.
+  write access to the Project. StarCast stores no consumer secrets.
 
 ## Workflow API
 
 Reusable workflows live directly in `.github/workflows/` and expose their
 contract through `workflow_call` inputs, secrets, permissions, and outputs.
 
-Consumers should reference a released version — currently `v0.2`, the
+Consumers should reference a released version — currently `v0.3`, the
 floating minor line (matching the convention `rubykatzen/baseline` and
 `rubykatzen/releaser` already use for their own pre-1.0 floating tags,
 e.g. `@v0.7`; SemVer treats `0.x` releases as initial development, where
@@ -182,7 +127,7 @@ major is the closer equivalent to a stable version pin until `v1` ships):
 ```yaml
 jobs:
   example:
-    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.2
+    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.3
 ```
 
 Pinning an immutable commit SHA provides the strongest supply-chain guarantee.

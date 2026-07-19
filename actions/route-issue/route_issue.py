@@ -7,8 +7,7 @@ assumed: after a real transfer, the issue's old node id stops resolving
 the issue is simply gone from the source repo. So a retry that can't find
 the issue there anymore is a completed transfer, not an error: this
 script resolves the issue by owner/repo/number right before mutating and
-treats "not found" as a successful no-op, the same discipline
-actions/intake-issue uses for its own idempotency check.
+treats "not found" as a successful no-op.
 
 createLabelsIfMissing was also verified directly: without it, a label
 with no same-named counterpart at the destination is silently dropped
