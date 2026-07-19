@@ -22,20 +22,23 @@ Treat these files as versioned consumer contracts:
   permissions, outputs, and behavior.
 - `actions/*/action.yml`: composite action inputs, outputs, and behavior.
 
-The current stable line is `v0.4`. Consumers should use `@v0.4` or an immutable
+The current stable line is `v0.5`. Consumers should use `@v0.5` or an immutable
 commit SHA. Do not recommend `@main` for stable consumers.
 
 ## Workflow behavior
 
 - `route-issue-shared.yml` transfers an issue according to an explicit label
   routing map.
-- `pull-issue-shared.yml` expands configured organizations to repositories,
+- `collect-issues-shared.yml` expands configured organizations to repositories,
   combines them with explicit repositories, and processes each unique
   repository independently. It paginates open issues directly and does not use
   GitHub Search. It adds only issues missing from the target Project, treats
   archived Project items as already present, and leaves Status assignment to
   Project automation. Its `organizations` and `repositories` inputs are JSON
   string arrays.
+- `collect-pull-requests-shared.yml` follows the same repository discovery and
+  Project membership rules for open pull requests, including drafts. Fork
+  pull requests are scoped by their base repository.
 
 ## Engineering rules
 

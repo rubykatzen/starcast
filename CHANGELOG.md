@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- `collect-pull-requests-shared.yml` reusable workflow and
+  `actions/collect-pull-requests` composite action: collect open pull requests,
+  including drafts, from configured
+  organizations/repositories into a GitHub Project V2. Existing active and
+  archived Project items are left untouched, and Status is owned by Project
+  automation.
+
+### Changed
+
+- **Breaking:** `pull-issue-shared.yml` and `actions/pull-issue` are renamed to
+  `collect-issues-shared.yml` and `actions/collect-issues` for consistent naming
+  across issue and pull-request collection.
+
 ## [v0.4.0] - 2026-07-19
 
 ### Changed

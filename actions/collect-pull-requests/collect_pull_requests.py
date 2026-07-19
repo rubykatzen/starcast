@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
-"""Pull open issues from a set of organizations/repos into a GitHub Project V2.
+"""Collect open pull requests into a GitHub Project V2.
 
-One workflow is configured centrally with a scope (organizations and/or
-individual repositories) and periodically discovers and pulls in whatever
-open issues currently exist there. Donor repositories need zero
-configuration.
+Organizations are expanded to their repositories, combined with explicitly
+configured repositories, and deduplicated. Each repository is processed
+independently: its complete `pullRequests(states: OPEN)` connection is
+compared with Project items filtered to that repository. This includes draft
+pull requests and pull requests whose head branch belongs to a fork; source
+scope is based on the base repository.
 
-Organizations are expanded to their repositories first, then combined
-with the explicitly configured repositories and deduplicated. Each
-repository is processed independently: its complete `issues(states: OPEN)`
-connection is compared with Project items filtered to that repository.
-Using repository connections avoids GitHub Search's 1,000-result ceiling.
-
-Membership is checked before any mutation, and archived items never reach
-the add mutation because it would unarchive them. Status is deliberately
-left to the target Project's automation.
+Membership is checked before any mutation. Archived items never reach the add
+mutation because it would unarchive them. Status is deliberately left to the
+target Project's automation.
 """
 
 import json
@@ -24,14 +20,7 @@ import sys
 
 
 def gh_graphql(query: str, **variables: str | int | None) -> dict:
-    """Run a GraphQL query/mutation via `gh api graphql`.
-
-    Values are typed by their Python type: `int` and `None` go through
-    `-F` (gh's typed flag, which converts numbers and the literal "null"
-    to real JSON types); everything else goes through `-f` (always a raw
-    JSON string), so a string value is never accidentally re-interpreted
-    as a number/bool/null even if it looks like one.
-    """
+    """Run a GraphQL query or mutation through `gh api graphql`."""
     args = ["gh", "api", "graphql", "-f", f"query={query}"]
     for key, value in variables.items():
         if value is None:
@@ -98,8 +87,8 @@ def fetch_organization_repositories(organization: str) -> list[str]:
     return repositories
 
 
-def fetch_open_issues(repo: str) -> list[dict]:
-    """Return every open issue in one repository."""
+def split_repository(repo: str) -> tuple[str, str]:
+    """Validate and split an owner/name repository reference."""
     try:
         owner, name = repo.split("/", 1)
     except ValueError:
@@ -108,15 +97,20 @@ def fetch_open_issues(repo: str) -> list[dict]:
     if not owner or not name or "/" in name:
         print(f"ERROR: repository '{repo}' must use the 'owner/name' format", file=sys.stderr)
         sys.exit(1)
+    return owner, name
 
-    issues = []
+
+def fetch_open_pull_requests(repo: str) -> list[dict]:
+    """Return every open pull request whose base is one repository."""
+    owner, name = split_repository(repo)
+    pull_requests = []
     cursor = None
     while True:
         data = gh_graphql(
             """
             query($owner: String!, $name: String!, $after: String) {
               repository(owner: $owner, name: $name) {
-                issues(states: OPEN, first: 100, after: $after) {
+                pullRequests(states: OPEN, first: 100, after: $after) {
                   pageInfo { hasNextPage endCursor }
                   nodes { id number }
                 }
@@ -131,12 +125,12 @@ def fetch_open_issues(repo: str) -> list[dict]:
         if not repository:
             print(f"ERROR: repository '{repo}' not found or inaccessible", file=sys.stderr)
             sys.exit(1)
-        page = repository["issues"]
-        issues += page["nodes"]
+        page = repository["pullRequests"]
+        pull_requests += page["nodes"]
         if not page["pageInfo"]["hasNextPage"]:
             break
         cursor = page["pageInfo"]["endCursor"]
-    return issues
+    return pull_requests
 
 
 def deduplicate(values: list[str]) -> list[str]:
@@ -170,8 +164,10 @@ def parse_json_array(raw_value: str, input_name: str) -> list[str]:
     return deduplicate(values)
 
 
-def fetch_project_items_for_repo(project_owner: str, project_number: int, repo: str) -> dict[str, dict]:
-    """Return existing Project items by issue node ID for one repository."""
+def fetch_project_items_for_repo(
+    project_owner: str, project_number: int, repo: str
+) -> dict[str, dict]:
+    """Return existing pull-request Project items by content node ID."""
     index: dict[str, dict] = {}
     cursor = None
     while True:
@@ -185,7 +181,7 @@ def fetch_project_items_for_repo(project_owner: str, project_number: int, repo: 
                     nodes {
                       id
                       isArchived
-                      content { ... on Issue { id } }
+                      content { ... on PullRequest { id } }
                     }
                   }
                 }
@@ -208,7 +204,7 @@ def fetch_project_items_for_repo(project_owner: str, project_number: int, repo: 
     return index
 
 
-def add_item(project_id: str, issue_node_id: str) -> None:
+def add_item(project_id: str, content_node_id: str) -> None:
     gh_graphql(
         """
         mutation($projectId: ID!, $contentId: ID!) {
@@ -218,7 +214,7 @@ def add_item(project_id: str, issue_node_id: str) -> None:
         }
         """,
         projectId=project_id,
-        contentId=issue_node_id,
+        contentId=content_node_id,
     )
 
 
@@ -242,28 +238,24 @@ def main() -> None:
 
     added, skipped_present, skipped_archived = [], [], []
     for repo in repositories:
-        issues = fetch_open_issues(repo)
-        if not issues:
+        pull_requests = fetch_open_pull_requests(repo)
+        if not pull_requests:
             continue
         project_items = fetch_project_items_for_repo(project_owner, project_number, repo)
-        for issue in issues:
-            label = f"{repo}#{issue['number']}"
-            existing = project_items.get(issue["id"])
+        for pull_request in pull_requests:
+            label = f"{repo}#{pull_request['number']}"
+            existing = project_items.get(pull_request["id"])
             if existing:
                 if existing["isArchived"]:
-                    # Never call addProjectV2ItemById or any mutation on an
-                    # archived item — the add mutation itself unarchives it
-                    # as a side effect, and there's no way to undo that
-                    # after the fact. Leave it fully alone.
                     skipped_archived.append(label)
                 else:
                     skipped_present.append(label)
                 continue
-            add_item(project_id, issue["id"])
+            add_item(project_id, pull_request["id"])
             added.append(label)
 
     summary = (
-        f"### pull-issue: {', '.join(organizations + configured_repositories)} "
+        f"### collect-pull-requests: {', '.join(organizations + configured_repositories)} "
         f"-> {project_owner}/#{project_number}\n\n"
         f"- Added: {added or 'none'}\n"
         f"- Already present (untouched): {skipped_present or 'none'}\n"
@@ -272,8 +264,8 @@ def main() -> None:
     print(summary)
     step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if step_summary:
-        with open(step_summary, "a", encoding="utf-8") as f:
-            f.write(summary)
+        with open(step_summary, "a", encoding="utf-8") as file:
+            file.write(summary)
 
 
 if __name__ == "__main__":
