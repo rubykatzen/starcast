@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.4.0] - 2026-07-19
+
 ### Changed
 
 - **Breaking:** `pull-issue-shared.yml` and `actions/pull-issue` replace the
