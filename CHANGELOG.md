@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.3.1] - 2026-07-19
+
 ### Removed
 
 - `intake-issue-shared.yml` reusable workflow and `actions/intake-issue`
