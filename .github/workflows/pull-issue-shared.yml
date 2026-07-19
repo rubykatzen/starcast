@@ -3,15 +3,15 @@ on:
   workflow_call:
     inputs:
       organizations:
-        description: 'Comma-separated org logins; every repo in each is in scope (e.g. "dupmachine,rubykatzen")'
+        description: 'JSON array of org logins; every repository in each organization is included'
         required: false
         type: string
-        default: ''
-      repos:
-        description: 'Comma-separated "owner/repo" entries'
+        default: '[]'
+      repositories:
+        description: 'JSON array of "owner/repo" entries'
         required: false
         type: string
-        default: ''
+        default: '[]'
       project_owner:
         description: 'Org login that owns the target Project'
         required: true
@@ -22,16 +22,16 @@ on:
         type: number
     secrets:
       token:
-        description: 'Token with read access to the configured organizations/repos and write access to the Project'
+        description: 'Token with read access to the configured organizations/repositories and write access to the Project'
         required: true
 jobs:
   pull:
     runs-on: ubuntu-latest
     steps:
-      - uses: rubykatzen/starcast/actions/pull-issue@v0.3
+      - uses: rubykatzen/starcast/actions/pull-issue@v0.4
         with:
           organizations: ${{ inputs.organizations }}
-          repos: ${{ inputs.repos }}
+          repositories: ${{ inputs.repositories }}
           project_owner: ${{ inputs.project_owner }}
           project_number: ${{ inputs.project_number }}
           github_token: ${{ secrets.token }}

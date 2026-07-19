@@ -139,16 +139,35 @@ def fetch_open_issues(repo: str) -> list[dict]:
     return issues
 
 
-def deduplicate_repositories(repositories: list[str]) -> list[str]:
-    """Deduplicate GitHub repository names case-insensitively, preserving order."""
+def deduplicate(values: list[str]) -> list[str]:
+    """Deduplicate GitHub names case-insensitively, preserving order."""
     unique = []
     seen = set()
-    for repo in repositories:
-        key = repo.casefold()
+    for value in values:
+        key = value.casefold()
         if key not in seen:
             seen.add(key)
-            unique.append(repo)
+            unique.append(value)
     return unique
+
+
+def parse_json_array(raw_value: str, input_name: str) -> list[str]:
+    """Validate and return one JSON-array action input."""
+    try:
+        values = json.loads(raw_value)
+    except json.JSONDecodeError as error:
+        print(f"ERROR: '{input_name}' must be valid JSON: {error.msg}", file=sys.stderr)
+        sys.exit(1)
+
+    if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+        print(f"ERROR: '{input_name}' must be a JSON array of strings", file=sys.stderr)
+        sys.exit(1)
+
+    values = [value.strip() for value in values]
+    if any(not value for value in values):
+        print(f"ERROR: '{input_name}' must not contain empty strings", file=sys.stderr)
+        sys.exit(1)
+    return deduplicate(values)
 
 
 def fetch_project_items_for_repo(project_owner: str, project_number: int, repo: str) -> dict[str, dict]:
@@ -206,19 +225,20 @@ def add_item(project_id: str, issue_node_id: str) -> None:
 def main() -> None:
     project_owner = os.environ["PROJECT_OWNER"]
     project_number = int(os.environ["PROJECT_NUMBER"])
-    organizations = [o.strip() for o in os.environ.get("ORGANIZATIONS", "").split(",") if o.strip()]
-    repos = [r.strip() for r in os.environ.get("REPOS", "").split(",") if r.strip()]
-
-    if not organizations and not repos:
-        print("ERROR: at least one of 'organizations' or 'repos' must be set", file=sys.stderr)
+    organizations = parse_json_array(os.environ.get("ORGANIZATIONS", "[]"), "organizations")
+    configured_repositories = parse_json_array(
+        os.environ.get("REPOSITORIES", "[]"), "repositories"
+    )
+    if not organizations and not configured_repositories:
+        print("ERROR: at least one organization or repository must be configured", file=sys.stderr)
         sys.exit(1)
 
     project_id = resolve_project(project_owner, project_number)
 
-    repositories = list(repos)
+    repositories = list(configured_repositories)
     for organization in organizations:
         repositories += fetch_organization_repositories(organization)
-    repositories = deduplicate_repositories(repositories)
+    repositories = deduplicate(repositories)
 
     added, skipped_present, skipped_archived = [], [], []
     for repo in repositories:
@@ -243,7 +263,8 @@ def main() -> None:
             added.append(label)
 
     summary = (
-        f"### pull-issue: {', '.join(organizations + repos)} -> {project_owner}/#{project_number}\n\n"
+        f"### pull-issue: {', '.join(organizations + configured_repositories)} "
+        f"-> {project_owner}/#{project_number}\n\n"
         f"- Added: {added or 'none'}\n"
         f"- Already present (untouched): {skipped_present or 'none'}\n"
         f"- Already present, archived (untouched): {skipped_archived or 'none'}\n"

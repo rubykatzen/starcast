@@ -22,7 +22,7 @@ Treat these files as versioned consumer contracts:
   permissions, outputs, and behavior.
 - `actions/*/action.yml`: composite action inputs, outputs, and behavior.
 
-The current stable line is `v0.3`. Consumers should use `@v0.3` or an immutable
+The current stable line is `v0.4`. Consumers should use `@v0.4` or an immutable
 commit SHA. Do not recommend `@main` for stable consumers.
 
 ## Workflow behavior
@@ -34,7 +34,8 @@ commit SHA. Do not recommend `@main` for stable consumers.
   repository independently. It paginates open issues directly and does not use
   GitHub Search. It adds only issues missing from the target Project, treats
   archived Project items as already present, and leaves Status assignment to
-  Project automation.
+  Project automation. Its `organizations` and `repositories` inputs are JSON
+  string arrays.
 
 ## Engineering rules
 

@@ -3,7 +3,7 @@ on:
   workflow_call:
     inputs:
       routes:
-        description: 'JSON object mapping exact label names to destination "owner/repo" (e.g. {"Household": "dupmachine/ground-control"})'
+        description: 'JSON object mapping exact label names to destination "owner/repo" (e.g. {"Household": "some-org/some-repo"})'
         required: true
         type: string
       label_name:
