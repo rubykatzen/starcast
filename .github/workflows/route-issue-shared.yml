@@ -27,7 +27,7 @@ jobs:
   route:
     runs-on: ubuntu-latest
     steps:
-      - uses: rubykatzen/starcast/actions/route-issue@v0.2
+      - uses: rubykatzen/starcast/actions/route-issue@v0.5
         with:
           routes: ${{ inputs.routes }}
           label_name: ${{ inputs.label_name }}
