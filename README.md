@@ -8,19 +8,30 @@ returns for another pass.
 ## Model
 
 ```text
-Queue -> Agent work -> Human review -> Accepted
-  ^                         |
-  +--------- Rework --------+
+Queue -> Propose -> Human review -> Accepted
+  ^                      |
+  +-- Reject / Rework ---+
 ```
 
 - An **issue** is the durable work object.
 - A **Project** represents an action performed on issues, not a topic or an
   agent identity.
 - Project **Status** is the process state machine.
-- A comment, patch, pull request, or other **review artifact** carries the
-  agent's proposed result without overwriting the source before approval.
+- A **proposal** is itself an issue (Type `Proposal`, a native GitHub
+  sub-issue of the one it proposes changes to) — its own fields hold the
+  proposed values directly, not text encoded inside a comment. It is the
+  review artifact: the agent's proposed result, which does not overwrite the
+  source before approval.
 - Returning an item to the queue preserves history and gives the next agent
   pass its feedback context.
+- The human's response to a proposal splits into what needs judgment and what
+  doesn't. `Apply` and `Reject` are mechanical — copy mapped fields, or close
+  the proposal — safe to run as a bare deterministic job with no agent
+  involved. `Distill` and `Rework` need an agent bound to the consumer's own
+  regulations: diffing what changed and classifying the lesson, or revising
+  the proposal from feedback left in comments instead of direct field edits.
+  This split, not just what an action does, is what decides which kind of
+  executor a workflow needs. See #11.
 
 StarCast is intended for processes that need an observable queue, repeated
 agent execution, human validation, and an auditable rework loop. It is not a
@@ -33,9 +44,10 @@ editorial pipeline implementation has been removed and is not supported. Its
 history remains available in Git.
 
 The current reusable workflows cover centralized Project intake for issues and
-pull requests, plus explicit label-based issue routing. The proposal-lifecycle
-contract (`proposal-lifecycle-shared.yml`) is scaffolded — its five jobs are
-wired and self-gated, but `Apply`/`Reject`/`Distill`/`Rework`/`Propose` are not
+pull requests, plus explicit label-based issue routing. The proposal-as-issue
+lifecycle described above (`Propose`/`Apply`/`Reject`/`Distill`/`Rework`) now
+has a scaffolded contract, `proposal-lifecycle-shared.yml` — its five jobs are
+wired and self-gated, but the domain logic behind each action is not
 implemented yet (tracked in #11).
 
 ## Reusable workflows
