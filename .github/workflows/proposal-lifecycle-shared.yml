@@ -1,0 +1,182 @@
+name: Proposal Lifecycle
+on:
+  workflow_call:
+    inputs:
+      regulations_repo:
+        description: '"owner/repo" that owns the regulations document consulted by Propose, Distill, and Rework'
+        required: true
+        type: string
+      regulations_path:
+        description: 'Path to the regulations document inside regulations_repo'
+        required: true
+        type: string
+      prefix:
+        description: 'Prefix stripped from a proposal field name to find the same-named field on the parent issue'
+        required: false
+        type: string
+        default: 'Proposal '
+      proposal_type_name:
+        description: 'Issue Type a proposal is created with'
+        required: false
+        type: string
+        default: 'Proposal'
+      issue_number:
+        description: 'Number of the proposal issue; required for issue_comment-triggered runs, must be absent for schedule/workflow_dispatch runs'
+        required: false
+        type: number
+      comment_id:
+        description: 'Id of the triggering comment; required for issue_comment-triggered runs, must be absent for schedule/workflow_dispatch runs'
+        required: false
+        type: number
+      telegram_chat_id:
+        description: 'Telegram chat id to report triggered actions and outcomes to; omit to disable reporting (see #46)'
+        required: false
+        type: string
+    secrets:
+      token:
+        description: 'Token with write access to issues, sub-issues, and Issue Fields on the parent and proposal repositories'
+        required: true
+      model_credentials:
+        description: 'Credentials for the model invoked by Propose, Distill, and Rework'
+        required: false
+      telegram_bot_token:
+        description: 'Telegram bot token used to send run reports; required if telegram_chat_id is set'
+        required: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert trigger context matches event type
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            if [ -z "${{ inputs.issue_number }}" ] || [ -z "${{ inputs.comment_id }}" ]; then
+              echo "::error::issue_comment-triggered runs must receive issue_number and comment_id"
+              exit 1
+            fi
+          else
+            if [ -n "${{ inputs.issue_number }}" ] || [ -n "${{ inputs.comment_id }}" ]; then
+              echo "::error::schedule/workflow_dispatch-triggered runs must not receive issue_number or comment_id"
+              exit 1
+            fi
+          fi
+
+  apply:
+    needs: validate
+    if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '[x] Apply')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: proposal-lifecycle-comment-${{ inputs.comment_id }}
+      cancel-in-progress: false
+    steps:
+      # Deterministic: copy mapped fields onto the parent, close sibling
+      # proposals. Not implemented yet — tracked in #11.
+      - name: Apply proposal (not yet implemented)
+        shell: bash
+        run: 'echo "::notice::apply is not implemented yet (see #11)"'
+      - name: Report to Telegram
+        if: always()
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        with:
+          chat_id: ${{ inputs.telegram_chat_id }}
+          bot_token: ${{ secrets.telegram_bot_token }}
+          workflow: Proposal Lifecycle
+          job: apply
+          action: Apply
+          status: ${{ job.status }}
+
+  reject:
+    needs: validate
+    if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '[x] Reject')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: proposal-lifecycle-comment-${{ inputs.comment_id }}
+      cancel-in-progress: false
+    steps:
+      # Deterministic: close the proposal, nothing else. Not implemented
+      # yet — tracked in #11.
+      - name: Reject proposal (not yet implemented)
+        shell: bash
+        run: 'echo "::notice::reject is not implemented yet (see #11)"'
+      - name: Report to Telegram
+        if: always()
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        with:
+          chat_id: ${{ inputs.telegram_chat_id }}
+          bot_token: ${{ secrets.telegram_bot_token }}
+          workflow: Proposal Lifecycle
+          job: reject
+          action: Reject
+          status: ${{ job.status }}
+
+  distill:
+    needs: validate
+    if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '[x] Distill')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: proposal-lifecycle-comment-${{ inputs.comment_id }}
+      cancel-in-progress: false
+    steps:
+      # Agent: diff proposed vs. human-edited values, propose a
+      # regulations change. Not implemented yet — tracked in #11/#13.
+      - name: Distill proposal (not yet implemented)
+        shell: bash
+        run: 'echo "::notice::distill is not implemented yet (see #11, #13)"'
+      - name: Report to Telegram
+        if: always()
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        with:
+          chat_id: ${{ inputs.telegram_chat_id }}
+          bot_token: ${{ secrets.telegram_bot_token }}
+          workflow: Proposal Lifecycle
+          job: distill
+          action: Distill
+          status: ${{ job.status }}
+
+  rework:
+    needs: validate
+    if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '[x] Rework')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: proposal-lifecycle-comment-${{ inputs.comment_id }}
+      cancel-in-progress: false
+    steps:
+      # Agent: read comment feedback and revise the proposal's fields.
+      # Not implemented yet — tracked in #11.
+      - name: Rework proposal (not yet implemented)
+        shell: bash
+        run: 'echo "::notice::rework is not implemented yet (see #11)"'
+      - name: Report to Telegram
+        if: always()
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        with:
+          chat_id: ${{ inputs.telegram_chat_id }}
+          bot_token: ${{ secrets.telegram_bot_token }}
+          workflow: Proposal Lifecycle
+          job: rework
+          action: Rework
+          status: ${{ job.status }}
+
+  propose:
+    needs: validate
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: proposal-lifecycle-propose-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      # Agent: read regulations and open a new proposal sub-issue. Not
+      # implemented yet — tracked in #11.
+      - name: Propose (not yet implemented)
+        shell: bash
+        run: 'echo "::notice::propose is not implemented yet (see #11)"'
+      - name: Report to Telegram
+        if: always()
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        with:
+          chat_id: ${{ inputs.telegram_chat_id }}
+          bot_token: ${{ secrets.telegram_bot_token }}
+          workflow: Proposal Lifecycle
+          job: propose
+          action: Propose
+          status: ${{ job.status }}

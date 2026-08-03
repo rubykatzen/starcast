@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- `proposal-lifecycle-shared.yml` reusable workflow: the contract for the
+  five-job proposal lifecycle (`apply`, `reject`, `distill`, `rework`,
+  `propose`) described in #11, with self-gating, an input-invariant check,
+  and per-comment/per-repository concurrency groups. Domain logic for each
+  action is not implemented yet — this release ships the contract and
+  reporting scaffold only.
+- `actions/telegram-notify` composite action: optionally report a job's
+  triggered action and outcome to a Telegram chat (#46). Opt-in per
+  consumer; a missing chat id/bot token is a no-op and a delivery failure
+  never fails the calling job.
+
 ## [v0.5.0] - 2026-07-19
 
 ### Added
