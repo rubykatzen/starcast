@@ -221,6 +221,9 @@ jobs:
 - **Optional Telegram reporting** (#46) — set `telegram_chat_id` and
   `telegram_bot_token` to have each job report which action ran and its
   outcome; omitting either is a clean no-op.
+- **Self-contained permissions** — the workflow declares its own top-level
+  `issues: write`, `contents: write`, `pull-requests: write` rather than
+  relying on whatever permissions a consumer's calling job happens to grant.
 
 ## Workflow API
 

@@ -42,6 +42,10 @@ on:
       telegram_bot_token:
         description: 'Telegram bot token used to send run reports; required if telegram_chat_id is set'
         required: false
+permissions:
+  issues: write
+  contents: write
+  pull-requests: write
 jobs:
   validate:
     runs-on: ubuntu-latest
