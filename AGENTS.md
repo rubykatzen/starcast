@@ -22,7 +22,7 @@ Treat these files as versioned consumer contracts:
   permissions, outputs, and behavior.
 - `actions/*/action.yml`: composite action inputs, outputs, and behavior.
 
-The current stable line is `v0.6`. Consumers should use `@v0.6` or an immutable
+The current stable line is `v0.7`. Consumers should use `@v0.7` or an immutable
 commit SHA. Do not recommend `@main` for stable consumers.
 
 ## Workflow behavior
