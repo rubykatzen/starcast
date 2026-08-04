@@ -4,7 +4,7 @@
 
 ### Added
 
-- `proposal-lifecycle-shared.yml` reusable workflow: the contract for the
+- `proposal-shared.yml` reusable workflow: the contract for the
   five-job proposal lifecycle (`apply`, `reject`, `distill`, `rework`,
   `propose`) described in #11, with self-gating, an input-invariant check,
   and per-comment/per-repository concurrency groups. Domain logic for each

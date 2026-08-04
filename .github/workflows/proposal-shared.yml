@@ -1,4 +1,4 @@
-name: Proposal Lifecycle
+name: Proposal
 on:
   workflow_call:
     inputs:
@@ -70,7 +70,7 @@ jobs:
     if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '[x] Apply')
     runs-on: ubuntu-latest
     concurrency:
-      group: proposal-lifecycle-comment-${{ inputs.comment_id }}
+      group: proposal-comment-${{ inputs.comment_id }}
       cancel-in-progress: false
     steps:
       # Deterministic: copy mapped fields onto the parent, close sibling
@@ -84,7 +84,7 @@ jobs:
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
-          workflow: Proposal Lifecycle
+          workflow: Proposal
           job: apply
           action: Apply
           status: ${{ job.status }}
@@ -94,7 +94,7 @@ jobs:
     if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '[x] Reject')
     runs-on: ubuntu-latest
     concurrency:
-      group: proposal-lifecycle-comment-${{ inputs.comment_id }}
+      group: proposal-comment-${{ inputs.comment_id }}
       cancel-in-progress: false
     steps:
       # Deterministic: close the proposal, nothing else. Not implemented
@@ -108,7 +108,7 @@ jobs:
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
-          workflow: Proposal Lifecycle
+          workflow: Proposal
           job: reject
           action: Reject
           status: ${{ job.status }}
@@ -118,7 +118,7 @@ jobs:
     if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '[x] Distill')
     runs-on: ubuntu-latest
     concurrency:
-      group: proposal-lifecycle-comment-${{ inputs.comment_id }}
+      group: proposal-comment-${{ inputs.comment_id }}
       cancel-in-progress: false
     steps:
       # Agent: diff proposed vs. human-edited values, propose a
@@ -132,7 +132,7 @@ jobs:
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
-          workflow: Proposal Lifecycle
+          workflow: Proposal
           job: distill
           action: Distill
           status: ${{ job.status }}
@@ -142,7 +142,7 @@ jobs:
     if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '[x] Rework')
     runs-on: ubuntu-latest
     concurrency:
-      group: proposal-lifecycle-comment-${{ inputs.comment_id }}
+      group: proposal-comment-${{ inputs.comment_id }}
       cancel-in-progress: false
     steps:
       # Agent: read comment feedback and revise the proposal's fields.
@@ -156,7 +156,7 @@ jobs:
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
-          workflow: Proposal Lifecycle
+          workflow: Proposal
           job: rework
           action: Rework
           status: ${{ job.status }}
@@ -166,7 +166,7 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
-      group: proposal-lifecycle-propose-${{ github.repository }}
+      group: proposal-propose-${{ github.repository }}
       cancel-in-progress: false
     steps:
       # Agent: read regulations and open a new proposal sub-issue. Not
@@ -180,7 +180,7 @@ jobs:
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
-          workflow: Proposal Lifecycle
+          workflow: Proposal
           job: propose
           action: Propose
           status: ${{ job.status }}
