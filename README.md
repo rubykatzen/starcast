@@ -46,7 +46,7 @@ history remains available in Git.
 The current reusable workflows cover centralized Project intake for issues and
 pull requests, plus explicit label-based issue routing. The proposal-as-issue
 lifecycle described above (`Propose`/`Apply`/`Reject`/`Distill`/`Rework`) now
-has a scaffolded contract, `proposal-lifecycle-shared.yml` — its five jobs are
+has a scaffolded contract, `proposal-shared.yml` — its five jobs are
 wired and self-gated, but the domain logic behind each action is not
 implemented yet (tracked in #11).
 
@@ -177,7 +177,7 @@ At least one organization or repository must be configured.
 - `token` needs read access across every configured organization/repository
   plus write access to the Project.
 
-### `proposal-lifecycle-shared.yml`
+### `proposal-shared.yml`
 
 A single reusable `workflow_call` contract for the five-action proposal
 lifecycle (`Propose`, `Apply`, `Reject`, `Distill`, `Rework`) described in #11:
@@ -192,7 +192,7 @@ on:
     - cron: '*/15 * * * *'
 jobs:
   handle:
-    uses: rubykatzen/starcast/.github/workflows/proposal-lifecycle-shared.yml@v0.6
+    uses: rubykatzen/starcast/.github/workflows/proposal-shared.yml@v0.6
     with:
       regulations_repo: some-org/some-repo
       regulations_path: REGULATIONS.md

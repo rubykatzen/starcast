@@ -39,7 +39,7 @@ commit SHA. Do not recommend `@main` for stable consumers.
 - `collect-pull-requests-shared.yml` follows the same repository discovery and
   Project membership rules for open pull requests, including drafts. Fork
   pull requests are scoped by their base repository.
-- `proposal-lifecycle-shared.yml` is the five-job contract (`apply`, `reject`,
+- `proposal-shared.yml` is the five-job contract (`apply`, `reject`,
   `distill`, `rework`, `propose`) for the proposal-lifecycle model in #11.
   Each job is self-gated on `github.event_name` and, for the four
   comment-triggered jobs, on which checkbox is checked. A `validate` job
