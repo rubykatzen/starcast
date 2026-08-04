@@ -60,7 +60,7 @@ applied, idempotently.
 ```yaml
 jobs:
   route:
-    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.6
+    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.7
     with:
       routes: >-
         {
@@ -102,7 +102,7 @@ scope. Donor repositories need zero configuration.
 ```yaml
 jobs:
   collect:
-    uses: rubykatzen/starcast/.github/workflows/collect-issues-shared.yml@v0.6
+    uses: rubykatzen/starcast/.github/workflows/collect-issues-shared.yml@v0.7
     with:
       organizations: >-
         [
@@ -147,7 +147,7 @@ repository for source matching. Draft pull requests are included.
 ```yaml
 jobs:
   collect:
-    uses: rubykatzen/starcast/.github/workflows/collect-pull-requests-shared.yml@v0.6
+    uses: rubykatzen/starcast/.github/workflows/collect-pull-requests-shared.yml@v0.7
     with:
       organizations: >-
         [
@@ -192,7 +192,7 @@ on:
     - cron: '*/15 * * * *'
 jobs:
   handle:
-    uses: rubykatzen/starcast/.github/workflows/proposal-shared.yml@v0.6
+    uses: rubykatzen/starcast/.github/workflows/proposal-shared.yml@v0.7
     with:
       regulations_repo: some-org/some-repo
       regulations_path: REGULATIONS.md
@@ -230,7 +230,7 @@ jobs:
 Reusable workflows live directly in `.github/workflows/` and expose their
 contract through `workflow_call` inputs, secrets, permissions, and outputs.
 
-Consumers should reference a released version — currently `v0.6`, the
+Consumers should reference a released version — currently `v0.7`, the
 floating minor line (matching the convention `rubykatzen/baseline` and
 `rubykatzen/releaser` already use for their own pre-1.0 floating tags,
 e.g. `@v0.7`; SemVer treats `0.x` releases as initial development, where
@@ -240,7 +240,7 @@ major is the closer equivalent to a stable version pin until `v1` ships):
 ```yaml
 jobs:
   example:
-    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.6
+    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.7
 ```
 
 Pinning an immutable commit SHA provides the strongest supply-chain guarantee.

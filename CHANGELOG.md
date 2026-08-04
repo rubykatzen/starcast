@@ -2,11 +2,20 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `proposal-lifecycle-shared.yml` is renamed to
+  `proposal-shared.yml`, matching the `<name>-shared.yml` pattern used by the
+  other reusable workflows. The workflow's `name:` and its Telegram-report
+  `workflow:` value change from "Proposal Lifecycle" to "Proposal", and its
+  concurrency group prefixes shorten from `proposal-lifecycle-*` to
+  `proposal-*`.
+
 ## [v0.6.0] - 2026-08-04
 
 ### Added
 
-- `proposal-shared.yml` reusable workflow: the contract for the
+- `proposal-lifecycle-shared.yml` reusable workflow: the contract for the
   five-job proposal lifecycle (`apply`, `reject`, `distill`, `rework`,
   `propose`) described in #11, with self-gating, an input-invariant check,
   and per-comment/per-repository concurrency groups. Domain logic for each
