@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.6.0] - 2026-08-04
+
 ### Added
 
 - `proposal-lifecycle-shared.yml` reusable workflow: the contract for the
