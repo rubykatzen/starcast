@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.7.0] - 2026-08-04
+
 ### Changed
 
 - **Breaking:** `proposal-lifecycle-shared.yml` is renamed to
