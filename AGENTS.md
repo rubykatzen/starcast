@@ -22,7 +22,7 @@ Treat these files as versioned consumer contracts:
   permissions, outputs, and behavior.
 - `actions/*/action.yml`: composite action inputs, outputs, and behavior.
 
-The current stable line is `v0.5`. Consumers should use `@v0.5` or an immutable
+The current stable line is `v0.6`. Consumers should use `@v0.6` or an immutable
 commit SHA. Do not recommend `@main` for stable consumers.
 
 ## Workflow behavior
@@ -39,6 +39,16 @@ commit SHA. Do not recommend `@main` for stable consumers.
 - `collect-pull-requests-shared.yml` follows the same repository discovery and
   Project membership rules for open pull requests, including drafts. Fork
   pull requests are scoped by their base repository.
+- `proposal-lifecycle-shared.yml` is the five-job contract (`apply`, `reject`,
+  `distill`, `rework`, `propose`) for the proposal-lifecycle model in #11.
+  Each job is self-gated on `github.event_name` and, for the four
+  comment-triggered jobs, on which checkbox is checked. A `validate` job
+  enforces that `issue_comment` runs carry `issue_number`/`comment_id` and
+  that `schedule`/`workflow_dispatch` runs do not. Domain logic for each
+  action is not implemented yet — only the contract, gating, and Telegram
+  reporting exist so far. `actions/telegram-notify` (#46) backs the reporting
+  step in every job; a missing `chat_id`/`bot_token` is a no-op, and a
+  delivery failure never fails the calling job.
 
 ## Engineering rules
 

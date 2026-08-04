@@ -45,8 +45,10 @@ history remains available in Git.
 
 The current reusable workflows cover centralized Project intake for issues and
 pull requests, plus explicit label-based issue routing. The proposal-as-issue
-lifecycle described above (`Propose`/`Apply`/`Reject`/`Distill`/`Rework`) is a
-design, tracked in #11 — not yet implemented as a reusable workflow.
+lifecycle described above (`Propose`/`Apply`/`Reject`/`Distill`/`Rework`) now
+has a scaffolded contract, `proposal-lifecycle-shared.yml` — its five jobs are
+wired and self-gated, but the domain logic behind each action is not
+implemented yet (tracked in #11).
 
 ## Reusable workflows
 
@@ -58,7 +60,7 @@ applied, idempotently.
 ```yaml
 jobs:
   route:
-    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.5
+    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.6
     with:
       routes: >-
         {
@@ -100,7 +102,7 @@ scope. Donor repositories need zero configuration.
 ```yaml
 jobs:
   collect:
-    uses: rubykatzen/starcast/.github/workflows/collect-issues-shared.yml@v0.5
+    uses: rubykatzen/starcast/.github/workflows/collect-issues-shared.yml@v0.6
     with:
       organizations: >-
         [
@@ -145,7 +147,7 @@ repository for source matching. Draft pull requests are included.
 ```yaml
 jobs:
   collect:
-    uses: rubykatzen/starcast/.github/workflows/collect-pull-requests-shared.yml@v0.5
+    uses: rubykatzen/starcast/.github/workflows/collect-pull-requests-shared.yml@v0.6
     with:
       organizations: >-
         [
@@ -175,12 +177,60 @@ At least one organization or repository must be configured.
 - `token` needs read access across every configured organization/repository
   plus write access to the Project.
 
+### `proposal-lifecycle-shared.yml`
+
+A single reusable `workflow_call` contract for the five-action proposal
+lifecycle (`Propose`, `Apply`, `Reject`, `Distill`, `Rework`) described in #11:
+a proposal is a native GitHub sub-issue of the parent it proposes changes to,
+and its own fields are copied onto the parent by naming convention.
+
+```yaml
+on:
+  issue_comment:
+    types: [edited]
+  schedule:
+    - cron: '*/15 * * * *'
+jobs:
+  handle:
+    uses: rubykatzen/starcast/.github/workflows/proposal-lifecycle-shared.yml@v0.6
+    with:
+      regulations_repo: some-org/some-repo
+      regulations_path: REGULATIONS.md
+      issue_number: ${{ github.event.issue.number }}
+      comment_id: ${{ github.event.comment.id }}
+      telegram_chat_id: ${{ vars.TELEGRAM_CHAT_ID }}
+    secrets:
+      token: ${{ secrets.PROJECTS_TOKEN }}
+      model_credentials: ${{ secrets.AGENT_API_KEY }}
+      telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+```
+
+- **Contract only, for now** — the workflow's five jobs are wired, self-gated
+  by trigger and checkbox, and each reports its outcome; the domain logic
+  behind `Apply`/`Reject`/`Distill`/`Rework`/`Propose` is not implemented yet
+  (tracked in #11).
+- **Self-gating** — `Apply`/`Reject`/`Distill`/`Rework` run only on
+  `issue_comment` when the matching checkbox (e.g. `[x] Apply`) is checked;
+  `Propose` runs only on `schedule`/`workflow_dispatch`.
+- **Invariant check** — a `validate` job asserts that `issue_comment` runs
+  carry `issue_number`/`comment_id` and that `schedule`/`workflow_dispatch`
+  runs do not; every other job depends on it.
+- **Concurrency** — `Apply`/`Reject`/`Distill`/`Rework` share a group keyed on
+  `comment_id`; `Propose` uses its own group keyed on the calling repository,
+  since a scheduled run has no comment to key on.
+- **Optional Telegram reporting** (#46) — set `telegram_chat_id` and
+  `telegram_bot_token` to have each job report which action ran and its
+  outcome; omitting either is a clean no-op.
+- **Self-contained permissions** — the workflow declares its own top-level
+  `issues: write`, `contents: write`, `pull-requests: write` rather than
+  relying on whatever permissions a consumer's calling job happens to grant.
+
 ## Workflow API
 
 Reusable workflows live directly in `.github/workflows/` and expose their
 contract through `workflow_call` inputs, secrets, permissions, and outputs.
 
-Consumers should reference a released version — currently `v0.5`, the
+Consumers should reference a released version — currently `v0.6`, the
 floating minor line (matching the convention `rubykatzen/baseline` and
 `rubykatzen/releaser` already use for their own pre-1.0 floating tags,
 e.g. `@v0.7`; SemVer treats `0.x` releases as initial development, where
@@ -190,7 +240,7 @@ major is the closer equivalent to a stable version pin until `v1` ships):
 ```yaml
 jobs:
   example:
-    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.5
+    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.6
 ```
 
 Pinning an immutable commit SHA provides the strongest supply-chain guarantee.

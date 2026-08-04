@@ -1,0 +1,38 @@
+name: 'Telegram Notify'
+description: 'Report a reusable-workflow run (triggered action and outcome) to a Telegram chat; a clean no-op when chat_id/bot_token are not configured'
+inputs:
+  chat_id:
+    description: 'Telegram chat id to report to; omit (with bot_token) to disable reporting'
+    required: false
+  bot_token:
+    description: 'Telegram bot token; omit (with chat_id) to disable reporting'
+    required: false
+  workflow:
+    description: 'Name of the calling reusable workflow (e.g. "Proposal Lifecycle")'
+    required: true
+  job:
+    description: 'Name of the job that ran (e.g. "apply")'
+    required: true
+  action:
+    description: 'The action that was triggered (e.g. "Apply", "Reject", "Distill", "Rework", "Propose")'
+    required: true
+  status:
+    description: 'Outcome of the job so far (e.g. the job.status context: success/failure/cancelled)'
+    required: true
+  details:
+    description: 'Optional free-form detail about the outcome (e.g. what was applied, or a no-op reason)'
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
+        TELEGRAM_BOT_TOKEN: ${{ inputs.bot_token }}
+        REPORT_WORKFLOW: ${{ inputs.workflow }}
+        REPORT_JOB: ${{ inputs.job }}
+        REPORT_ACTION: ${{ inputs.action }}
+        REPORT_STATUS: ${{ inputs.status }}
+        REPORT_DETAILS: ${{ inputs.details }}
+      run: python3 "$GITHUB_ACTION_PATH/telegram_notify.py"
