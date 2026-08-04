@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- `actions/apply-proposal` composite action: copies a proposal's mapped
+  Issue Fields onto its parent (`type`/`parent`/`labels` handled as
+  reserved names via native Issue Type, sub-issue, and Label mutations),
+  then closes the proposal and any open sibling proposals of the same
+  parent. Idempotent — a no-op against an already-closed proposal.
+- `actions/reject-proposal` composite action: closes a proposal, nothing
+  else.
+
+### Changed
+
+- `proposal-shared.yml`'s `apply` and `reject` jobs now run the actions
+  above instead of a placeholder notice.
+
 ## [v0.7.0] - 2026-08-04
 
 ### Changed

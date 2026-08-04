@@ -60,7 +60,7 @@ applied, idempotently.
 ```yaml
 jobs:
   route:
-    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.7
+    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.8
     with:
       routes: >-
         {
@@ -102,7 +102,7 @@ scope. Donor repositories need zero configuration.
 ```yaml
 jobs:
   collect:
-    uses: rubykatzen/starcast/.github/workflows/collect-issues-shared.yml@v0.7
+    uses: rubykatzen/starcast/.github/workflows/collect-issues-shared.yml@v0.8
     with:
       organizations: >-
         [
@@ -147,7 +147,7 @@ repository for source matching. Draft pull requests are included.
 ```yaml
 jobs:
   collect:
-    uses: rubykatzen/starcast/.github/workflows/collect-pull-requests-shared.yml@v0.7
+    uses: rubykatzen/starcast/.github/workflows/collect-pull-requests-shared.yml@v0.8
     with:
       organizations: >-
         [
@@ -192,7 +192,7 @@ on:
     - cron: '*/15 * * * *'
 jobs:
   handle:
-    uses: rubykatzen/starcast/.github/workflows/proposal-shared.yml@v0.7
+    uses: rubykatzen/starcast/.github/workflows/proposal-shared.yml@v0.8
     with:
       regulations_repo: some-org/some-repo
       regulations_path: REGULATIONS.md
@@ -205,10 +205,15 @@ jobs:
       telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 ```
 
-- **Contract only, for now** — the workflow's five jobs are wired, self-gated
-  by trigger and checkbox, and each reports its outcome; the domain logic
-  behind `Apply`/`Reject`/`Distill`/`Rework`/`Propose` is not implemented yet
-  (tracked in #11).
+- **`Apply`/`Reject` are implemented** — `Apply` copies every proposal Issue
+  Field whose name starts with `prefix` onto the same-named field on the
+  parent (`type`/`parent`/`labels` are reserved, handled via native Issue
+  Type, sub-issue, and Label mutations instead of a generic field write), then
+  closes the proposal and any open sibling proposals of the same parent. An
+  empty/unset proposal field leaves the parent's field untouched. `Reject`
+  just closes the proposal. Both are idempotent: re-running against an
+  already-closed proposal is a no-op. `Distill`/`Rework`/`Propose` are still
+  placeholders (tracked in #11).
 - **Self-gating** — `Apply`/`Reject`/`Distill`/`Rework` run only on
   `issue_comment` when the matching checkbox (e.g. `[x] Apply`) is checked;
   `Propose` runs only on `schedule`/`workflow_dispatch`.
@@ -230,7 +235,7 @@ jobs:
 Reusable workflows live directly in `.github/workflows/` and expose their
 contract through `workflow_call` inputs, secrets, permissions, and outputs.
 
-Consumers should reference a released version — currently `v0.7`, the
+Consumers should reference a released version — currently `v0.8`, the
 floating minor line (matching the convention `rubykatzen/baseline` and
 `rubykatzen/releaser` already use for their own pre-1.0 floating tags,
 e.g. `@v0.7`; SemVer treats `0.x` releases as initial development, where
@@ -240,7 +245,7 @@ major is the closer equivalent to a stable version pin until `v1` ships):
 ```yaml
 jobs:
   example:
-    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.7
+    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.8
 ```
 
 Pinning an immutable commit SHA provides the strongest supply-chain guarantee.

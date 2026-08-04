@@ -22,7 +22,7 @@ Treat these files as versioned consumer contracts:
   permissions, outputs, and behavior.
 - `actions/*/action.yml`: composite action inputs, outputs, and behavior.
 
-The current stable line is `v0.7`. Consumers should use `@v0.7` or an immutable
+The current stable line is `v0.8`. Consumers should use `@v0.8` or an immutable
 commit SHA. Do not recommend `@main` for stable consumers.
 
 ## Workflow behavior
@@ -44,11 +44,22 @@ commit SHA. Do not recommend `@main` for stable consumers.
   Each job is self-gated on `github.event_name` and, for the four
   comment-triggered jobs, on which checkbox is checked. A `validate` job
   enforces that `issue_comment` runs carry `issue_number`/`comment_id` and
-  that `schedule`/`workflow_dispatch` runs do not. Domain logic for each
-  action is not implemented yet — only the contract, gating, and Telegram
-  reporting exist so far. `actions/telegram-notify` (#46) backs the reporting
-  step in every job; a missing `chat_id`/`bot_token` is a no-op, and a
-  delivery failure never fails the calling job.
+  that `schedule`/`workflow_dispatch` runs do not. `actions/telegram-notify`
+  (#46) backs the reporting step in every job; a missing `chat_id`/`bot_token`
+  is a no-op, and a delivery failure never fails the calling job.
+  - `actions/apply-proposal` copies every proposal Issue Field whose name
+    starts with `prefix` onto the same-named Issue Field on the parent (the
+    proposal's native sub-issue `parent`), via `setIssueFieldValue`. `type`,
+    `parent`, and `labels` are reserved stripped names handled via
+    `updateIssueIssueType`, `addSubIssue`, and `addLabelsToLabelable`
+    respectively rather than a generic field write. An empty/unset proposal
+    field leaves the parent's field untouched. Applying closes the proposal
+    and every open sibling proposal of the same parent (other sub-issues
+    whose Issue Type matches `proposal_type_name`). Re-running against an
+    already-closed proposal is a no-op.
+  - `actions/reject-proposal` closes the proposal — nothing else. Closing an
+    already-closed issue is a no-op on GitHub's side.
+  - `distill`/`rework`/`propose` are still placeholders.
 
 ## Engineering rules
 
