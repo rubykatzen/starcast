@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+
+- `actions/dequeue-proposal` composite action and `capacity_query`/
+  `queue_query`/`review_limit` inputs on `proposal-shared.yml`'s `propose`
+  job: consumer-owned GraphQL queries gate and source the next proposal
+  candidate, one per run. `capacity_query` must alias exactly one scalar
+  numeric field as `capacity`, `queue_query` exactly one array-valued
+  field as `queue`; both are found by a recursive, type-disambiguated
+  alias search rather than a schema-aware mapping.
+
+### Changed
+
+- `proposal-shared.yml`'s `validate` job now also requires
+  `capacity_query`/`queue_query`/`review_limit` on schedule/
+  `workflow_dispatch` runs.
+
 ## [v0.8.0] - 2026-08-05
 
 ### Added

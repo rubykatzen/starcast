@@ -1,0 +1,36 @@
+name: 'Dequeue Proposal'
+description: 'Check review capacity and dequeue at most one candidate issue for a new proposal (#55)'
+inputs:
+  capacity_query:
+    description: 'GraphQL query text; must alias exactly one scalar numeric field as `capacity`'
+    required: true
+  queue_query:
+    description: 'GraphQL query text; must alias exactly one array-valued field as `queue`, each element an issue-shaped object with at least `id`. Only the first element is used'
+    required: true
+  review_limit:
+    description: 'Maximum number of issues allowed in review at once'
+    required: true
+  github_token:
+    description: 'Token used to run capacity_query and queue_query'
+    required: true
+outputs:
+  result:
+    description: '"dequeued", "no-op-at-capacity", or "no-op-empty-queue"'
+    value: ${{ steps.dequeue.outputs.result }}
+  issue_id:
+    description: 'GraphQL node id of the dequeued issue, empty unless result is "dequeued"'
+    value: ${{ steps.dequeue.outputs.issue_id }}
+  summary:
+    description: 'Human-readable summary of the outcome'
+    value: ${{ steps.dequeue.outputs.summary }}
+runs:
+  using: composite
+  steps:
+    - id: dequeue
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        CAPACITY_QUERY: ${{ inputs.capacity_query }}
+        QUEUE_QUERY: ${{ inputs.queue_query }}
+        REVIEW_LIMIT: ${{ inputs.review_limit }}
+      run: python3 "$GITHUB_ACTION_PATH/dequeue_proposal.py"
