@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.8.0] - 2026-08-05
+
 ### Added
 
 - `actions/apply-proposal` composite action: copies a proposal's mapped
