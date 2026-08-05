@@ -91,8 +91,9 @@ jobs:
     steps:
       - name: Apply proposal
         id: apply
-        uses: rubykatzen/starcast/actions/apply-proposal@v0.8
+        uses: rubykatzen/starcast/actions/proposal@v0.9
         with:
+          mode: apply
           repository: ${{ github.repository }}
           issue_number: ${{ inputs.issue_number }}
           prefix: ${{ inputs.prefix }}
@@ -120,8 +121,9 @@ jobs:
     steps:
       - name: Reject proposal
         id: reject
-        uses: rubykatzen/starcast/actions/reject-proposal@v0.8
+        uses: rubykatzen/starcast/actions/proposal@v0.9
         with:
+          mode: reject
           repository: ${{ github.repository }}
           issue_number: ${{ inputs.issue_number }}
           github_token: ${{ secrets.token }}
@@ -195,18 +197,24 @@ jobs:
     steps:
       - name: Dequeue next proposal candidate
         id: dequeue
-        uses: rubykatzen/starcast/actions/dequeue-proposal@v0.9
+        uses: rubykatzen/starcast/actions/proposal@v0.9
         with:
+          mode: dequeue
           capacity_query: ${{ inputs.capacity_query }}
           queue_query: ${{ inputs.queue_query }}
           review_limit: ${{ inputs.review_limit }}
           github_token: ${{ secrets.token }}
-      # Agent: read regulations and open a new proposal sub-issue for the
-      # dequeued candidate. Not implemented yet — tracked in #11.
-      - name: Create proposal (not yet implemented)
+      # Field values are mocked, not agent-decided yet — tracked in #11.
+      - name: Create proposal
+        id: propose
         if: steps.dequeue.outputs.result == 'dequeued'
-        shell: bash
-        run: 'echo "::notice::proposal creation for ${{ steps.dequeue.outputs.issue_id }} is not implemented yet (see #11)"'
+        uses: rubykatzen/starcast/actions/proposal@v0.9
+        with:
+          mode: propose
+          parent_issue_id: ${{ steps.dequeue.outputs.issue_id }}
+          prefix: ${{ inputs.prefix }}
+          proposal_type_name: ${{ inputs.proposal_type_name }}
+          github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
         uses: rubykatzen/starcast/actions/telegram-notify@v0.6
@@ -217,4 +225,4 @@ jobs:
           job: propose
           action: Propose
           status: ${{ job.status }}
-          details: ${{ steps.dequeue.outputs.summary }}
+          details: ${{ steps.propose.outputs.summary || steps.dequeue.outputs.summary }}

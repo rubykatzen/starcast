@@ -45,10 +45,11 @@ history remains available in Git.
 
 The current reusable workflows cover centralized Project intake for issues and
 pull requests, plus explicit label-based issue routing. The proposal-as-issue
-lifecycle described above (`Propose`/`Apply`/`Reject`/`Distill`/`Rework`) now
-has a scaffolded contract, `proposal-shared.yml` — its five jobs are
-wired and self-gated, but the domain logic behind each action is not
-implemented yet (tracked in #11).
+lifecycle described above (`Propose`/`Apply`/`Reject`/`Distill`/`Rework`) has a
+working contract, `proposal-shared.yml`: `Apply`/`Reject` are fully
+implemented, `Propose` dequeues and creates a proposal with mocked field
+values (real agent judgment not wired in yet), and `Distill`/`Rework` remain
+placeholders (tracked in #11).
 
 ## Reusable workflows
 
@@ -208,6 +209,11 @@ jobs:
       telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 ```
 
+- **One CLI backs `dequeue`/`list-fields`/`propose`/`apply`/`reject`** —
+  `actions/proposal` wraps a single Homebrew-style tool
+  (`proposal_tool.py <mode> --flag value`) rather than one script per
+  action, so the five modes share transport, field-discovery, and
+  mutation helpers instead of duplicating them.
 - **`Apply`/`Reject` are implemented** — `Apply` copies the proposal's `title`
   and `body` onto the parent unconditionally, plus every proposal Issue Field
   whose name starts with `prefix` onto the same-named field on the parent
@@ -217,18 +223,31 @@ jobs:
   empty/unset proposal field (title/body included) leaves the parent's field
   untouched. `Reject` just closes the proposal. Both are idempotent:
   re-running against an already-closed proposal is a no-op.
-- **`Propose` dequeues, but doesn't create yet** (#55) — on each scheduled
-  run it runs the consumer-supplied `capacity_query`, and if the result is
-  below `review_limit`, runs `queue_query` and takes its first candidate;
-  at capacity or an empty queue are both clean no-ops. Both queries are
-  consumer-owned GraphQL text: `capacity_query` must alias exactly one
-  scalar numeric field as `capacity`, `queue_query` exactly one array-valued
-  field as `queue` (each element at least `{ id }`), found by a recursive
-  walk matching alias name and value type — zero or more than one match is
-  a hard configuration error. Only one candidate is ever dequeued per run,
-  so no pagination/cursor state is needed between runs. Actually creating
-  the proposal for a dequeued candidate is still a placeholder (tracked in
-  #11); `Distill`/`Rework` remain placeholders too.
+- **`Propose` dequeues and creates, with mocked content** (#55, #11) — on
+  each scheduled run it runs the consumer-supplied `capacity_query`, and if
+  the result is below `review_limit`, runs `queue_query` and takes its first
+  candidate; at capacity or an empty queue are both clean no-ops. Both
+  queries are consumer-owned GraphQL text: `capacity_query` must alias
+  exactly one scalar numeric field as `capacity`, `queue_query` exactly one
+  array-valued field as `queue` (each element at least `{ id }`), found by a
+  recursive walk matching alias name and value type — zero or more than one
+  match is a hard configuration error. Only one candidate is ever dequeued
+  per run, so no pagination/cursor state is needed between runs. When a
+  candidate is found, `Propose` creates the proposal issue against it —
+  Issue Type, sub-issue relationship, the control comment — but **fills every
+  field with a trivial mock value rather than a real agent decision**; wiring
+  in regulation-constrained judgment is tracked in #11. `Distill`/`Rework`
+  remain placeholders.
+- **The control comment has one fixed template**, posted by `Propose`
+  immediately after creation and gated on by `Apply`/`Reject`/`Distill`/
+  `Rework`: `- [ ] Apply`, `- [ ] Reject`, `- [ ] Distill`, `- [ ] Rework`,
+  nothing else. Verifying that a triggering comment actually *is* a given
+  proposal's control comment (as opposed to some other comment containing
+  matching text) isn't enforced yet — tracked in #63.
+- **`list-fields`** discovers which Issue Fields in a repository start with
+  `prefix`, plus the always-available fixed set (`title`, `body`, `type`,
+  `parent`, `labels`) — the menu a caller picks from when deciding what a
+  proposal can hold.
 - **Self-gating** — `Apply`/`Reject`/`Distill`/`Rework` run only on
   `issue_comment` when the matching checkbox (e.g. `[x] Apply`) is checked;
   `Propose` runs only on `schedule`/`workflow_dispatch`.

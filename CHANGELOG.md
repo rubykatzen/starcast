@@ -4,16 +4,35 @@
 
 ### Added
 
-- `actions/dequeue-proposal` composite action and `capacity_query`/
-  `queue_query`/`review_limit` inputs on `proposal-shared.yml`'s `propose`
-  job: consumer-owned GraphQL queries gate and source the next proposal
-  candidate, one per run. `capacity_query` must alias exactly one scalar
-  numeric field as `capacity`, `queue_query` exactly one array-valued
-  field as `queue`; both are found by a recursive, type-disambiguated
-  alias search rather than a schema-aware mapping.
+- `actions/proposal` composite action: a single Homebrew-style CLI
+  (`proposal_tool.py <mode> --flag value`) covering the whole proposal
+  lifecycle's deterministic surface — `dequeue`, `list-fields`,
+  `propose`, `apply`, `reject` — sharing transport, field-discovery, and
+  mutation helpers instead of one script per action.
+  - `dequeue`: consumer-owned `capacity_query`/`queue_query` gate and
+    source the next proposal candidate, one per run — see
+    `capacity_query`/`queue_query`/`review_limit` inputs on
+    `proposal-shared.yml`'s `propose` job. `capacity_query` must alias
+    exactly one scalar numeric field as `capacity`, `queue_query` exactly
+    one array-valued field as `queue`; both are found by a recursive,
+    type-disambiguated alias search rather than a schema-aware mapping.
+  - `list-fields`: discovers the prefixed proposal Issue Fields available
+    in a repository.
+  - `propose`: creates a proposal issue against a parent — Issue Type,
+    sub-issue relationship, field values, and the control comment. Field
+    *values* are mocked (a trivial type-appropriate placeholder) rather
+    than agent-decided; real regulation-constrained judgment is tracked
+    in #11.
+  - `apply`/`reject`: unchanged behavior from the actions they replace
+    (below), now reached via `mode: apply`/`mode: reject`.
+- `proposal-shared.yml`'s `propose` job now dequeues a candidate and
+  creates a (mocked) proposal for it, instead of a placeholder notice.
 
 ### Changed
 
+- **Breaking:** `actions/apply-proposal` and `actions/reject-proposal`
+  (added in v0.8.0) are removed; their behavior moves to
+  `actions/proposal` with `mode: apply`/`mode: reject`.
 - `proposal-shared.yml`'s `validate` job now also requires
   `capacity_query`/`queue_query`/`review_limit` on schedule/
   `workflow_dispatch` runs.
