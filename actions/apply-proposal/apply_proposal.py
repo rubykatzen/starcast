@@ -2,15 +2,19 @@
 """Apply a proposal's fields onto its parent issue, deterministically (#11).
 
 A proposal is a native GitHub sub-issue of the issue it proposes changes
-to (its `parent`). Every proposal Issue Field whose name starts with the
-configured prefix targets the same-named Issue Field on the parent by
-convention — no declarative field mapping is needed. Three stripped names
-are reserved and handled specially rather than written through
-`setIssueFieldValue`: `type` (the parent's native Issue Type), `parent`
-(a full issue URL; attaches the *parent's own* parent via `addSubIssue`),
-and `labels` (a multi-select; each option becomes a native Label via
-`addLabelsToLabelable`). An empty/unset proposal field means "leave the
-parent's corresponding field untouched," not "clear it."
+to (its `parent`). `title` and `body` are copied onto the parent
+unconditionally, the same mechanical action as every other field — not
+implied only by the proposal holding its own title/body, per #11. Every
+proposal Issue Field whose name starts with the configured prefix
+targets the same-named Issue Field on the parent by convention — no
+declarative field mapping is needed. Three stripped names are reserved
+and handled specially rather than written through `setIssueFieldValue`:
+`type` (the parent's native Issue Type), `parent` (a full issue URL;
+attaches the *parent's own* parent via `addSubIssue`), and `labels` (a
+multi-select; each option becomes a native Label via
+`addLabelsToLabelable`). An empty/unset proposal field (title/body
+included) means "leave the parent's corresponding field untouched," not
+"clear it."
 
 Applying closes the proposal and every sibling proposal of the same
 parent (other open sub-issues whose Issue Type matches proposal_type_name),
@@ -23,6 +27,18 @@ treated as already handled rather than re-processed.
 Schema shapes (IssueField*/IssueFieldValue* unions, setIssueFieldValue,
 addSubIssue, updateIssueIssueType) were verified against the live GitHub
 GraphQL schema via introspection, not assumed.
+
+gh_graphql sends the whole request body as JSON via `gh api graphql
+--input -` rather than per-variable `-f`/`-F` flags: this script's
+mutations need list- and object-shaped variables (`issueFields`,
+`labelIds`, a partial `UpdateIssueInput`), and `-f`/`-F` only support
+scalar values — a JSON-encoded string passed through `-f` is sent as a
+literal GraphQL string, not a parsed list/object. Confirmed live against
+a disposable scratch issue, not assumed: `--input -` round-trips a
+nested object and an array correctly, and omitting a key from an input
+object (rather than setting it to `null`) is what actually leaves that
+field untouched — passing an explicit `null` is a different, unverified
+code path this script avoids entirely by construction.
 """
 
 import json
@@ -34,32 +50,25 @@ import sys
 ISSUE_URL_RE = re.compile(r"^https://github\.com/([^/]+)/([^/]+)/issues/(\d+)$")
 
 
-def gh_graphql(query: str, **variables: str | int | bool | None) -> dict:
-    """Run a GraphQL query/mutation via `gh api graphql`.
-
-    Values are typed by their Python type: `int`/`bool`/`None` go through
-    `-F` (gh's typed flag, which converts numbers, true/false, and the
-    literal "null" to real JSON types); everything else goes through `-f`
-    (always a raw JSON string).
-    """
-    args = ["gh", "api", "graphql", "-f", f"query={query}"]
-    for key, value in variables.items():
-        if value is None:
-            args += ["-F", f"{key}=null"]
-        elif isinstance(value, (int, bool)):
-            args += ["-F", f"{key}={str(value).lower() if isinstance(value, bool) else value}"]
-        else:
-            args += ["-f", f"{key}={value}"]
-    result = subprocess.run(args, capture_output=True, text=True, check=False)
+def gh_graphql(query: str, **variables: object) -> dict:
+    """Run a GraphQL query/mutation via `gh api graphql --input -`."""
+    payload = json.dumps({"query": query, "variables": variables})
+    result = subprocess.run(
+        ["gh", "api", "graphql", "--input", "-"],
+        input=payload,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if result.returncode != 0:
         print(result.stdout, file=sys.stderr)
         print(result.stderr, file=sys.stderr)
         sys.exit(1)
-    payload = json.loads(result.stdout)
-    if "errors" in payload:
-        print(json.dumps(payload["errors"]), file=sys.stderr)
+    data = json.loads(result.stdout)
+    if "errors" in data:
+        print(json.dumps(data["errors"]), file=sys.stderr)
         sys.exit(1)
-    return payload["data"]
+    return data["data"]
 
 
 def fetch_proposal(owner: str, name: str, number: int) -> dict | None:
@@ -70,6 +79,8 @@ def fetch_proposal(owner: str, name: str, number: int) -> dict | None:
             issue(number: $number) {
               id
               closed
+              title
+              body
               parent {
                 id
                 number
@@ -286,7 +297,35 @@ def set_issue_field_values(issue_id: str, field_inputs: list[dict]) -> None:
         }
         """,
         issueId=issue_id,
-        issueFields=json.dumps(field_inputs),
+        issueFields=field_inputs,
+    )
+
+
+def update_issue_title_body(issue_id: str, title: str | None, body: str | None) -> None:
+    """Copy title/body onto the parent, omitting whichever is empty.
+
+    Built as one `$input` object rather than named `$title`/`$body`
+    variables: a key that is *absent* from the input object leaves that
+    field untouched, but a key present with value `null` is a distinct,
+    unverified code path this avoids by construction (confirmed live
+    against a disposable scratch issue — see the module docstring).
+    """
+    if not title and not body:
+        return
+    input_object = {"id": issue_id}
+    if title:
+        input_object["title"] = title
+    if body:
+        input_object["body"] = body
+    gh_graphql(
+        """
+        mutation($input: UpdateIssueInput!) {
+          updateIssue(input: $input) {
+            clientMutationId
+          }
+        }
+        """,
+        input=input_object,
     )
 
 
@@ -330,7 +369,7 @@ def add_labels(labelable_id: str, label_ids: list[str]) -> None:
         }
         """,
         labelableId=labelable_id,
-        labelIds=json.dumps(label_ids),
+        labelIds=label_ids,
     )
 
 
@@ -420,10 +459,19 @@ def main() -> None:
     parent_name = parent["repository"]["name"]
     parent_id = parent["id"]
 
+    applied = []
+
+    # Copied unconditionally, same as every prefixed field — not implied
+    # only by the proposal holding its own title/body, per #11.
+    update_issue_title_body(parent_id, proposal["title"], proposal["body"])
+    if proposal["title"]:
+        applied.append("title")
+    if proposal["body"]:
+        applied.append("body")
+
     field_values = fetch_proposal_field_values(owner, name, proposal_number)
     parent_fields = fetch_repository_issue_fields(parent_owner, parent_name)
 
-    applied = []
     generic_inputs = []
     for entry in field_values:
         if not entry["field_name"].startswith(prefix):

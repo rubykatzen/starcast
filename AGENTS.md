@@ -47,16 +47,23 @@ commit SHA. Do not recommend `@main` for stable consumers.
   that `schedule`/`workflow_dispatch` runs do not. `actions/telegram-notify`
   (#46) backs the reporting step in every job; a missing `chat_id`/`bot_token`
   is a no-op, and a delivery failure never fails the calling job.
-  - `actions/apply-proposal` copies every proposal Issue Field whose name
+  - `actions/apply-proposal` copies the proposal's `title`/`body` onto the
+    parent unconditionally, plus every proposal Issue Field whose name
     starts with `prefix` onto the same-named Issue Field on the parent (the
     proposal's native sub-issue `parent`), via `setIssueFieldValue`. `type`,
     `parent`, and `labels` are reserved stripped names handled via
     `updateIssueIssueType`, `addSubIssue`, and `addLabelsToLabelable`
     respectively rather than a generic field write. An empty/unset proposal
-    field leaves the parent's field untouched. Applying closes the proposal
-    and every open sibling proposal of the same parent (other sub-issues
-    whose Issue Type matches `proposal_type_name`). Re-running against an
-    already-closed proposal is a no-op.
+    field (title/body included) leaves the parent's field untouched, by
+    omitting that key from the mutation's input object rather than passing
+    an explicit `null` — confirmed live which of the two actually leaves a
+    field untouched, not assumed. Applying closes the proposal and every
+    open sibling proposal of the same parent (other sub-issues whose Issue
+    Type matches `proposal_type_name`). Re-running against an already-closed
+    proposal is a no-op. GraphQL calls go through `gh api graphql --input -`
+    with a full JSON body rather than per-variable `-f`/`-F` flags, because
+    this action's mutations need list/object-shaped variables that `-f`/`-F`
+    cannot express.
   - `actions/reject-proposal` closes the proposal — nothing else. Closing an
     already-closed issue is a no-op on GitHub's side.
   - `distill`/`rework`/`propose` are still placeholders.

@@ -12,16 +12,23 @@ import subprocess
 import sys
 
 
-def gh_graphql(query: str, **variables: str | int | None) -> dict:
-    args = ["gh", "api", "graphql", "-f", f"query={query}"]
-    for key, value in variables.items():
-        if value is None:
-            args += ["-F", f"{key}=null"]
-        elif isinstance(value, int):
-            args += ["-F", f"{key}={value}"]
-        else:
-            args += ["-f", f"{key}={value}"]
-    result = subprocess.run(args, capture_output=True, text=True, check=False)
+def gh_graphql(query: str, **variables: object) -> dict:
+    """Run a GraphQL query/mutation via `gh api graphql --input -`.
+
+    A full JSON request body, not per-variable `-f`/`-F` flags: those only
+    support scalar values, and a JSON-encoded string passed through `-f`
+    is sent as a literal GraphQL string rather than a parsed list/object
+    (see actions/apply-proposal/apply_proposal.py, which needs this for
+    list/object-shaped variables).
+    """
+    payload = json.dumps({"query": query, "variables": variables})
+    result = subprocess.run(
+        ["gh", "api", "graphql", "--input", "-"],
+        input=payload,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if result.returncode != 0:
         print(result.stdout, file=sys.stderr)
         print(result.stderr, file=sys.stderr)

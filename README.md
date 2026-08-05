@@ -205,15 +205,16 @@ jobs:
       telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 ```
 
-- **`Apply`/`Reject` are implemented** — `Apply` copies every proposal Issue
-  Field whose name starts with `prefix` onto the same-named field on the
-  parent (`type`/`parent`/`labels` are reserved, handled via native Issue
-  Type, sub-issue, and Label mutations instead of a generic field write), then
+- **`Apply`/`Reject` are implemented** — `Apply` copies the proposal's `title`
+  and `body` onto the parent unconditionally, plus every proposal Issue Field
+  whose name starts with `prefix` onto the same-named field on the parent
+  (`type`/`parent`/`labels` are reserved, handled via native Issue Type,
+  sub-issue, and Label mutations instead of a generic field write), then
   closes the proposal and any open sibling proposals of the same parent. An
-  empty/unset proposal field leaves the parent's field untouched. `Reject`
-  just closes the proposal. Both are idempotent: re-running against an
-  already-closed proposal is a no-op. `Distill`/`Rework`/`Propose` are still
-  placeholders (tracked in #11).
+  empty/unset proposal field (title/body included) leaves the parent's field
+  untouched. `Reject` just closes the proposal. Both are idempotent:
+  re-running against an already-closed proposal is a no-op. `Distill`/
+  `Rework`/`Propose` are still placeholders (tracked in #11).
 - **Self-gating** — `Apply`/`Reject`/`Distill`/`Rework` run only on
   `issue_comment` when the matching checkbox (e.g. `[x] Apply`) is checked;
   `Propose` runs only on `schedule`/`workflow_dispatch`.
