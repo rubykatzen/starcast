@@ -73,11 +73,15 @@ jobs:
       group: proposal-comment-${{ inputs.comment_id }}
       cancel-in-progress: false
     steps:
-      # Deterministic: copy mapped fields onto the parent, close sibling
-      # proposals. Not implemented yet — tracked in #11.
-      - name: Apply proposal (not yet implemented)
-        shell: bash
-        run: 'echo "::notice::apply is not implemented yet (see #11)"'
+      - name: Apply proposal
+        id: apply
+        uses: rubykatzen/starcast/actions/apply-proposal@v0.8
+        with:
+          repository: ${{ github.repository }}
+          issue_number: ${{ inputs.issue_number }}
+          prefix: ${{ inputs.prefix }}
+          proposal_type_name: ${{ inputs.proposal_type_name }}
+          github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
         uses: rubykatzen/starcast/actions/telegram-notify@v0.6
@@ -88,6 +92,7 @@ jobs:
           job: apply
           action: Apply
           status: ${{ job.status }}
+          details: ${{ steps.apply.outputs.summary }}
 
   reject:
     needs: validate
@@ -97,11 +102,13 @@ jobs:
       group: proposal-comment-${{ inputs.comment_id }}
       cancel-in-progress: false
     steps:
-      # Deterministic: close the proposal, nothing else. Not implemented
-      # yet — tracked in #11.
-      - name: Reject proposal (not yet implemented)
-        shell: bash
-        run: 'echo "::notice::reject is not implemented yet (see #11)"'
+      - name: Reject proposal
+        id: reject
+        uses: rubykatzen/starcast/actions/reject-proposal@v0.8
+        with:
+          repository: ${{ github.repository }}
+          issue_number: ${{ inputs.issue_number }}
+          github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
         uses: rubykatzen/starcast/actions/telegram-notify@v0.6
@@ -112,6 +119,7 @@ jobs:
           job: reject
           action: Reject
           status: ${{ job.status }}
+          details: ${{ steps.reject.outputs.summary }}
 
   distill:
     needs: validate
