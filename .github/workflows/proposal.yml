@@ -1,0 +1,20 @@
+name: Proposal (dogfood)
+on:
+  issue_comment:
+    types: [edited]
+  workflow_dispatch:
+jobs:
+  handle:
+    uses: ./.github/workflows/proposal-shared.yml
+    with:
+      regulations_repo: rubykatzen/starcast
+      regulations_path: AGENTS.md
+      issue_number: ${{ github.event.issue.number }}
+      comment_id: ${{ github.event.comment.id }}
+      capacity_query: >-
+        query { repository(owner: "rubykatzen", name: "starcast") { issues(states: OPEN, filterBy: {type: "Proposal"}) { capacity: totalCount } } }
+      queue_query: >-
+        query { repository(owner: "rubykatzen", name: "starcast") { issues(states: OPEN, first: 5, orderBy: {field: CREATED_AT, direction: ASC}) { queue: nodes { id number } } } }
+      review_limit: 1
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
