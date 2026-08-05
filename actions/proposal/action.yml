@@ -85,4 +85,4 @@ runs:
             exit 1
             ;;
         esac
-        python3 "$GITHUB_ACTION_PATH/proposal_tool.py" "${args[@]}"
+        python3 "$GITHUB_ACTION_PATH/proposal.py" "${args[@]}"

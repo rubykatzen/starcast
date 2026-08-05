@@ -211,7 +211,7 @@ jobs:
 
 - **One CLI backs `dequeue`/`list-fields`/`propose`/`apply`/`reject`** —
   `actions/proposal` wraps a single Homebrew-style tool
-  (`proposal_tool.py <mode> --flag value`) rather than one script per
+  (`proposal.py <mode> --flag value`) rather than one script per
   action, so the five modes share transport, field-discovery, and
   mutation helpers instead of duplicating them.
 - **`Apply`/`Reject` are implemented** — `Apply` copies the proposal's `title`

@@ -50,7 +50,7 @@ commit SHA. Do not recommend `@main` for stable consumers.
   every job; a missing `chat_id`/`bot_token` is a no-op, and a delivery
   failure never fails the calling job.
   - `actions/proposal` is one composite action wrapping one CLI,
-    `proposal_tool.py <mode> --flag value` (Homebrew-style subcommands),
+    `proposal.py <mode> --flag value` (Homebrew-style subcommands),
     so `dequeue`/`list-fields`/`propose`/`apply`/`reject` share transport
     (`gh api graphql --input -` with a full JSON body, not per-variable
     `-f`/`-F` flags — several modes need list/object-shaped variables that

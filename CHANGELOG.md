@@ -5,7 +5,7 @@
 ### Added
 
 - `actions/proposal` composite action: a single Homebrew-style CLI
-  (`proposal_tool.py <mode> --flag value`) covering the whole proposal
+  (`proposal.py <mode> --flag value`) covering the whole proposal
   lifecycle's deterministic surface — `dequeue`, `list-fields`,
   `propose`, `apply`, `reject` — sharing transport, field-discovery, and
   mutation helpers instead of one script per action.

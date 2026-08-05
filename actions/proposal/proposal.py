@@ -2,7 +2,7 @@
 """Unified CLI for the proposal lifecycle (#11, #55): dequeue, list-fields,
 propose, apply, reject.
 
-One executable with subcommands (`proposal_tool.py <mode> --flag value`,
+One executable with subcommands (`proposal.py <mode> --flag value`,
 Homebrew-style) rather than one script per action, so the five modes
 share transport, field-discovery, and mutation helpers instead of
 duplicating them. `--github-token` is deliberately not among the flags
@@ -93,7 +93,7 @@ def write_output(**fields: str) -> None:
     if output_path:
         with open(output_path, "a", encoding="utf-8") as f:
             f.write(lines)
-    summary = "### proposal-tool\n\n" + "".join(f"- {k}: {v}\n" for k, v in fields.items())
+    summary = "### proposal\n\n" + "".join(f"- {k}: {v}\n" for k, v in fields.items())
     print(summary)
     step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if step_summary:
@@ -789,7 +789,7 @@ def cmd_reject(args: argparse.Namespace) -> None:
 # --------------------------------------------------------------------- CLI
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="proposal_tool.py")
+    parser = argparse.ArgumentParser(prog="proposal.py")
     subparsers = parser.add_subparsers(required=True, dest="mode")
 
     dequeue = subparsers.add_parser("dequeue", help="check review capacity and dequeue at most one candidate (#55)")
