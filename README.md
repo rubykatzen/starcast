@@ -266,6 +266,75 @@ jobs:
   `issues: write`, `contents: write`, `pull-requests: write` rather than
   relying on whatever permissions a consumer's calling job happens to grant.
 
+#### Two `capacity_query`/`queue_query` shapes (#55)
+
+The alias-based extraction doesn't care about schema depth or shape — only
+that a scalar is aliased `capacity` and an array `queue` somewhere in the
+response. Two structurally different sources demonstrate that: a plain
+repository issue list, and a GitHub Project.
+
+Repository-based (this repo's own dogfood caller,
+`.github/workflows/proposal.yml`, uses this shape):
+
+```graphql
+query {
+  repository(owner: "some-org", name: "some-repo") {
+    issues(states: OPEN, filterBy: { type: "Proposal" }) {
+      capacity: totalCount
+    }
+  }
+}
+```
+
+```graphql
+query {
+  repository(owner: "some-org", name: "some-repo") {
+    issues(states: OPEN, first: 5, orderBy: { field: CREATED_AT, direction: ASC }) {
+      queue: nodes { id number }
+    }
+  }
+}
+```
+
+Project-based — capacity from a Status field, queue from a differently
+structured connection nested under `organization.projectV2` rather than
+`repository`:
+
+```graphql
+query {
+  organization(login: "some-org") {
+    projectV2(number: 4) {
+      items(first: 100, query: "status:Review") {
+        capacity: totalCount
+      }
+    }
+  }
+}
+```
+
+```graphql
+query {
+  organization(login: "some-org") {
+    projectV2(number: 4) {
+      items(first: 5, query: "status:Queue") {
+        queue: nodes {
+          content { ... on Issue { id } }
+        }
+      }
+    }
+  }
+}
+```
+
+`ProjectV2.items`'s `query` argument and `ProjectV2Item.content { ... on Issue }`
+were confirmed against GitHub's live GraphQL schema via introspection, not
+assumed. The exact search-string syntax a `query: "status:Review"` filter
+accepts for a custom field wasn't round-tripped end-to-end — this org doesn't
+currently have a Project V2 to test against — so treat that specific string
+as illustrative; the structural point (`capacity`/`queue` aliased under
+`organization.projectV2` rather than `repository`, a genuinely different
+nesting shape) is what's load-bearing here.
+
 ## Workflow API
 
 Reusable workflows live directly in `.github/workflows/` and expose their

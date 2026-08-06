@@ -4,6 +4,10 @@ on:
     types: [edited]
   workflow_dispatch:
 jobs:
+  # This queue_query is a minimal dogfood/testing example, not a template to
+  # copy verbatim: it does not exclude issues that already have an open
+  # sibling proposal, which #55 explicitly leaves to each consumer's own
+  # query to encode.
   handle:
     uses: ./.github/workflows/proposal-shared.yml
     with:
