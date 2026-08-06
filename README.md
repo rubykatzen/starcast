@@ -45,10 +45,11 @@ history remains available in Git.
 
 The current reusable workflows cover centralized Project intake for issues and
 pull requests, plus explicit label-based issue routing. The proposal-as-issue
-lifecycle described above (`Propose`/`Apply`/`Reject`/`Distill`/`Rework`) now
-has a scaffolded contract, `proposal-shared.yml` — its five jobs are
-wired and self-gated, but the domain logic behind each action is not
-implemented yet (tracked in #11).
+lifecycle described above (`Propose`/`Apply`/`Reject`/`Distill`/`Rework`) has a
+working contract, `proposal-shared.yml`: `Apply`/`Reject` are fully
+implemented, `Propose` dequeues and creates a proposal with mocked field
+values (real agent judgment not wired in yet), and `Distill`/`Rework` remain
+placeholders (tracked in #11).
 
 ## Reusable workflows
 
@@ -60,7 +61,7 @@ applied, idempotently.
 ```yaml
 jobs:
   route:
-    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.8
+    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.9
     with:
       routes: >-
         {
@@ -102,7 +103,7 @@ scope. Donor repositories need zero configuration.
 ```yaml
 jobs:
   collect:
-    uses: rubykatzen/starcast/.github/workflows/collect-issues-shared.yml@v0.8
+    uses: rubykatzen/starcast/.github/workflows/collect-issues-shared.yml@v0.9
     with:
       organizations: >-
         [
@@ -147,7 +148,7 @@ repository for source matching. Draft pull requests are included.
 ```yaml
 jobs:
   collect:
-    uses: rubykatzen/starcast/.github/workflows/collect-pull-requests-shared.yml@v0.8
+    uses: rubykatzen/starcast/.github/workflows/collect-pull-requests-shared.yml@v0.9
     with:
       organizations: >-
         [
@@ -192,19 +193,27 @@ on:
     - cron: '*/15 * * * *'
 jobs:
   handle:
-    uses: rubykatzen/starcast/.github/workflows/proposal-shared.yml@v0.8
+    uses: rubykatzen/starcast/.github/workflows/proposal-shared.yml@v0.9
     with:
       regulations_repo: some-org/some-repo
       regulations_path: REGULATIONS.md
       issue_number: ${{ github.event.issue.number }}
       comment_id: ${{ github.event.comment.id }}
       telegram_chat_id: ${{ vars.TELEGRAM_CHAT_ID }}
+      capacity_query: ${{ vars.PROPOSAL_CAPACITY_QUERY }}
+      queue_query: ${{ vars.PROPOSAL_QUEUE_QUERY }}
+      review_limit: 5
     secrets:
       token: ${{ secrets.PROJECTS_TOKEN }}
       model_credentials: ${{ secrets.AGENT_API_KEY }}
       telegram_bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 ```
 
+- **One CLI backs `dequeue`/`list-fields`/`propose`/`apply`/`reject`** —
+  `actions/proposal` wraps a single Homebrew-style tool
+  (`proposal.py <mode> --flag value`) rather than one script per
+  action, so the five modes share transport, field-discovery, and
+  mutation helpers instead of duplicating them.
 - **`Apply`/`Reject` are implemented** — `Apply` copies the proposal's `title`
   and `body` onto the parent unconditionally, plus every proposal Issue Field
   whose name starts with `prefix` onto the same-named field on the parent
@@ -213,14 +222,40 @@ jobs:
   closes the proposal and any open sibling proposals of the same parent. An
   empty/unset proposal field (title/body included) leaves the parent's field
   untouched. `Reject` just closes the proposal. Both are idempotent:
-  re-running against an already-closed proposal is a no-op. `Distill`/
-  `Rework`/`Propose` are still placeholders (tracked in #11).
+  re-running against an already-closed proposal is a no-op.
+- **`Propose` dequeues and creates, with mocked content** (#55, #11) — on
+  each scheduled run it runs the consumer-supplied `capacity_query`, and if
+  the result is below `review_limit`, runs `queue_query` and takes its first
+  candidate; at capacity or an empty queue are both clean no-ops. Both
+  queries are consumer-owned GraphQL text: `capacity_query` must alias
+  exactly one scalar numeric field as `capacity`, `queue_query` exactly one
+  array-valued field as `queue` (each element at least `{ id }`), found by a
+  recursive walk matching alias name and value type — zero or more than one
+  match is a hard configuration error. Only one candidate is ever dequeued
+  per run, so no pagination/cursor state is needed between runs. When a
+  candidate is found, `Propose` creates the proposal issue against it —
+  Issue Type, sub-issue relationship, the control comment — but **fills every
+  field with a trivial mock value rather than a real agent decision**; wiring
+  in regulation-constrained judgment is tracked in #11. `Distill`/`Rework`
+  remain placeholders.
+- **The control comment has one fixed template**, posted by `Propose`
+  immediately after creation and gated on by `Apply`/`Reject`/`Distill`/
+  `Rework`: `- [ ] Apply`, `- [ ] Reject`, `- [ ] Distill`, `- [ ] Rework`,
+  nothing else. Verifying that a triggering comment actually *is* a given
+  proposal's control comment (as opposed to some other comment containing
+  matching text) isn't enforced yet — tracked in #63.
+- **`list-fields`** discovers which Issue Fields in a repository start with
+  `prefix`, plus the always-available fixed set (`title`, `body`, `type`,
+  `parent`, `labels`) — the menu a caller picks from when deciding what a
+  proposal can hold.
 - **Self-gating** — `Apply`/`Reject`/`Distill`/`Rework` run only on
   `issue_comment` when the matching checkbox (e.g. `[x] Apply`) is checked;
   `Propose` runs only on `schedule`/`workflow_dispatch`.
 - **Invariant check** — a `validate` job asserts that `issue_comment` runs
   carry `issue_number`/`comment_id` and that `schedule`/`workflow_dispatch`
-  runs do not; every other job depends on it.
+  runs do not, and that `schedule`/`workflow_dispatch` runs carry
+  `capacity_query`/`queue_query`/`review_limit`; every other job depends on
+  it.
 - **Concurrency** — `Apply`/`Reject`/`Distill`/`Rework` share a group keyed on
   `comment_id`; `Propose` uses its own group keyed on the calling repository,
   since a scheduled run has no comment to key on.
@@ -231,12 +266,81 @@ jobs:
   `issues: write`, `contents: write`, `pull-requests: write` rather than
   relying on whatever permissions a consumer's calling job happens to grant.
 
+#### Two `capacity_query`/`queue_query` shapes (#55)
+
+The alias-based extraction doesn't care about schema depth or shape — only
+that a scalar is aliased `capacity` and an array `queue` somewhere in the
+response. Two structurally different sources demonstrate that: a plain
+repository issue list, and a GitHub Project.
+
+Repository-based (this repo's own dogfood caller,
+`.github/workflows/proposal.yml`, uses this shape):
+
+```graphql
+query {
+  repository(owner: "some-org", name: "some-repo") {
+    issues(states: OPEN, filterBy: { type: "Proposal" }) {
+      capacity: totalCount
+    }
+  }
+}
+```
+
+```graphql
+query {
+  repository(owner: "some-org", name: "some-repo") {
+    issues(states: OPEN, first: 5, orderBy: { field: CREATED_AT, direction: ASC }) {
+      queue: nodes { id number }
+    }
+  }
+}
+```
+
+Project-based — capacity from a Status field, queue from a differently
+structured connection nested under `organization.projectV2` rather than
+`repository`:
+
+```graphql
+query {
+  organization(login: "some-org") {
+    projectV2(number: 4) {
+      items(first: 100, query: "status:Review") {
+        capacity: totalCount
+      }
+    }
+  }
+}
+```
+
+```graphql
+query {
+  organization(login: "some-org") {
+    projectV2(number: 4) {
+      items(first: 5, query: "status:Queue") {
+        queue: nodes {
+          content { ... on Issue { id } }
+        }
+      }
+    }
+  }
+}
+```
+
+`ProjectV2.items`'s `query` argument and `ProjectV2Item.content { ... on Issue }`
+were confirmed against GitHub's live GraphQL schema via introspection, not
+assumed. The exact search-string syntax a `query: "status:Review"` filter
+accepts for a custom field wasn't round-tripped end-to-end — this org doesn't
+currently have a Project V2 to test against — so treat that specific string
+as illustrative; the structural point (`capacity`/`queue` aliased under
+`organization.projectV2` rather than `repository`, a genuinely different
+nesting shape) is what's load-bearing here.
+
 ## Workflow API
 
 Reusable workflows live directly in `.github/workflows/` and expose their
 contract through `workflow_call` inputs, secrets, permissions, and outputs.
 
-Consumers should reference a released version — currently `v0.8`, the
+Consumers should reference a released version — currently `v0.9`, the
 floating minor line (matching the convention `rubykatzen/baseline` and
 `rubykatzen/releaser` already use for their own pre-1.0 floating tags,
 e.g. `@v0.7`; SemVer treats `0.x` releases as initial development, where
@@ -246,7 +350,7 @@ major is the closer equivalent to a stable version pin until `v1` ships):
 ```yaml
 jobs:
   example:
-    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.8
+    uses: rubykatzen/starcast/.github/workflows/example.yml@v0.9
 ```
 
 Pinning an immutable commit SHA provides the strongest supply-chain guarantee.

@@ -1,0 +1,88 @@
+name: 'Proposal'
+description: 'Unified CLI for the proposal lifecycle: dequeue, list-fields, propose, apply, reject (#11, #55)'
+inputs:
+  mode:
+    description: '"dequeue", "list-fields", "propose", "apply", or "reject"'
+    required: true
+  repository:
+    description: '"owner/repo" (list-fields, apply, reject)'
+    required: false
+  issue_number:
+    description: 'Proposal issue number (apply, reject)'
+    required: false
+  parent_issue_id:
+    description: 'GraphQL node id of the issue to propose against (propose)'
+    required: false
+  capacity_query:
+    description: 'GraphQL query text; must alias exactly one scalar numeric field as `capacity` (dequeue)'
+    required: false
+  queue_query:
+    description: 'GraphQL query text; must alias exactly one array-valued field as `queue` (dequeue)'
+    required: false
+  review_limit:
+    description: 'Maximum number of issues allowed in review at once (dequeue)'
+    required: false
+  prefix:
+    description: 'Prefix stripped from a proposal field name to find the same-named field on the parent (list-fields, propose, apply)'
+    required: false
+    default: 'Proposal '
+  proposal_type_name:
+    description: 'Issue Type a proposal is created with / identified by (propose, apply)'
+    required: false
+    default: 'Proposal'
+  github_token:
+    description: 'Token with write access to issues, sub-issues, Issue Fields, and Issue Types on the relevant repositories'
+    required: true
+outputs:
+  result:
+    description: 'Outcome; meaning depends on mode (e.g. "dequeued"/"no-op-at-capacity" for dequeue, "applied"/"no-op" for apply)'
+    value: ${{ steps.run.outputs.result }}
+  issue_id:
+    description: 'GraphQL node id relevant to the outcome, when applicable'
+    value: ${{ steps.run.outputs.issue_id }}
+  fields:
+    description: 'JSON field catalog (list-fields only)'
+    value: ${{ steps.run.outputs.fields }}
+  summary:
+    description: 'Human-readable summary of the outcome'
+    value: ${{ steps.run.outputs.summary }}
+runs:
+  using: composite
+  steps:
+    - id: run
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        MODE: ${{ inputs.mode }}
+        REPOSITORY: ${{ inputs.repository }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+        PARENT_ISSUE_ID: ${{ inputs.parent_issue_id }}
+        CAPACITY_QUERY: ${{ inputs.capacity_query }}
+        QUEUE_QUERY: ${{ inputs.queue_query }}
+        REVIEW_LIMIT: ${{ inputs.review_limit }}
+        PREFIX: ${{ inputs.prefix }}
+        PROPOSAL_TYPE_NAME: ${{ inputs.proposal_type_name }}
+      run: |
+        args=("$MODE")
+        case "$MODE" in
+          dequeue)
+            args+=(--capacity-query "$CAPACITY_QUERY" --queue-query "$QUEUE_QUERY" --review-limit "$REVIEW_LIMIT")
+            ;;
+          list-fields)
+            args+=(--repository "$REPOSITORY" --prefix "$PREFIX")
+            ;;
+          propose)
+            args+=(--parent-issue-id "$PARENT_ISSUE_ID" --prefix "$PREFIX" --type "$PROPOSAL_TYPE_NAME")
+            ;;
+          apply)
+            args+=(--repository "$REPOSITORY" --issue-number "$ISSUE_NUMBER" --prefix "$PREFIX" --type "$PROPOSAL_TYPE_NAME")
+            ;;
+          reject)
+            args+=(--repository "$REPOSITORY" --issue-number "$ISSUE_NUMBER")
+            ;;
+          *)
+            echo "::error::unknown mode '$MODE'"
+            exit 1
+            ;;
+        esac
+        python3 "$GITHUB_ACTION_PATH/proposal.py" "${args[@]}"

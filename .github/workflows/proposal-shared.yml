@@ -32,6 +32,18 @@ on:
         description: 'Telegram chat id to report triggered actions and outcomes to; omit to disable reporting (see #46)'
         required: false
         type: string
+      capacity_query:
+        description: 'GraphQL query text; must alias exactly one scalar numeric field as `capacity`. Required for schedule/workflow_dispatch runs (see #55)'
+        required: false
+        type: string
+      queue_query:
+        description: 'GraphQL query text; must alias exactly one array-valued field as `queue`, each element an issue-shaped object with at least `id`. Only the first element is used. Required for schedule/workflow_dispatch runs (see #55)'
+        required: false
+        type: string
+      review_limit:
+        description: 'Maximum number of issues allowed in review at once. Required for schedule/workflow_dispatch runs (see #55)'
+        required: false
+        type: number
     secrets:
       token:
         description: 'Token with write access to issues, sub-issues, and Issue Fields on the parent and proposal repositories'
@@ -63,6 +75,10 @@ jobs:
               echo "::error::schedule/workflow_dispatch-triggered runs must not receive issue_number or comment_id"
               exit 1
             fi
+            if [ -z "${{ inputs.capacity_query }}" ] || [ -z "${{ inputs.queue_query }}" ] || [ -z "${{ inputs.review_limit }}" ]; then
+              echo "::error::schedule/workflow_dispatch-triggered runs must receive capacity_query, queue_query, and review_limit"
+              exit 1
+            fi
           fi
 
   apply:
@@ -75,8 +91,9 @@ jobs:
     steps:
       - name: Apply proposal
         id: apply
-        uses: rubykatzen/starcast/actions/apply-proposal@v0.8
+        uses: rubykatzen/starcast/actions/proposal@v0.9
         with:
+          mode: apply
           repository: ${{ github.repository }}
           issue_number: ${{ inputs.issue_number }}
           prefix: ${{ inputs.prefix }}
@@ -104,8 +121,9 @@ jobs:
     steps:
       - name: Reject proposal
         id: reject
-        uses: rubykatzen/starcast/actions/reject-proposal@v0.8
+        uses: rubykatzen/starcast/actions/proposal@v0.9
         with:
+          mode: reject
           repository: ${{ github.repository }}
           issue_number: ${{ inputs.issue_number }}
           github_token: ${{ secrets.token }}
@@ -177,11 +195,26 @@ jobs:
       group: proposal-propose-${{ github.repository }}
       cancel-in-progress: false
     steps:
-      # Agent: read regulations and open a new proposal sub-issue. Not
-      # implemented yet — tracked in #11.
-      - name: Propose (not yet implemented)
-        shell: bash
-        run: 'echo "::notice::propose is not implemented yet (see #11)"'
+      - name: Dequeue next proposal candidate
+        id: dequeue
+        uses: rubykatzen/starcast/actions/proposal@v0.9
+        with:
+          mode: dequeue
+          capacity_query: ${{ inputs.capacity_query }}
+          queue_query: ${{ inputs.queue_query }}
+          review_limit: ${{ inputs.review_limit }}
+          github_token: ${{ secrets.token }}
+      # Field values are mocked, not agent-decided yet — tracked in #11.
+      - name: Create proposal
+        id: propose
+        if: steps.dequeue.outputs.result == 'dequeued'
+        uses: rubykatzen/starcast/actions/proposal@v0.9
+        with:
+          mode: propose
+          parent_issue_id: ${{ steps.dequeue.outputs.issue_id }}
+          prefix: ${{ inputs.prefix }}
+          proposal_type_name: ${{ inputs.proposal_type_name }}
+          github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
         uses: rubykatzen/starcast/actions/telegram-notify@v0.6
@@ -192,3 +225,4 @@ jobs:
           job: propose
           action: Propose
           status: ${{ job.status }}
+          details: ${{ steps.propose.outputs.summary || steps.dequeue.outputs.summary }}

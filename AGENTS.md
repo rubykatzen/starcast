@@ -22,7 +22,7 @@ Treat these files as versioned consumer contracts:
   permissions, outputs, and behavior.
 - `actions/*/action.yml`: composite action inputs, outputs, and behavior.
 
-The current stable line is `v0.8`. Consumers should use `@v0.8` or an immutable
+The current stable line is `v0.9`. Consumers should use `@v0.9` or an immutable
 commit SHA. Do not recommend `@main` for stable consumers.
 
 ## Workflow behavior
@@ -44,29 +44,58 @@ commit SHA. Do not recommend `@main` for stable consumers.
   Each job is self-gated on `github.event_name` and, for the four
   comment-triggered jobs, on which checkbox is checked. A `validate` job
   enforces that `issue_comment` runs carry `issue_number`/`comment_id` and
-  that `schedule`/`workflow_dispatch` runs do not. `actions/telegram-notify`
-  (#46) backs the reporting step in every job; a missing `chat_id`/`bot_token`
-  is a no-op, and a delivery failure never fails the calling job.
-  - `actions/apply-proposal` copies the proposal's `title`/`body` onto the
-    parent unconditionally, plus every proposal Issue Field whose name
-    starts with `prefix` onto the same-named Issue Field on the parent (the
-    proposal's native sub-issue `parent`), via `setIssueFieldValue`. `type`,
-    `parent`, and `labels` are reserved stripped names handled via
-    `updateIssueIssueType`, `addSubIssue`, and `addLabelsToLabelable`
-    respectively rather than a generic field write. An empty/unset proposal
-    field (title/body included) leaves the parent's field untouched, by
-    omitting that key from the mutation's input object rather than passing
-    an explicit `null` — confirmed live which of the two actually leaves a
-    field untouched, not assumed. Applying closes the proposal and every
-    open sibling proposal of the same parent (other sub-issues whose Issue
-    Type matches `proposal_type_name`). Re-running against an already-closed
-    proposal is a no-op. GraphQL calls go through `gh api graphql --input -`
-    with a full JSON body rather than per-variable `-f`/`-F` flags, because
-    this action's mutations need list/object-shaped variables that `-f`/`-F`
-    cannot express.
-  - `actions/reject-proposal` closes the proposal — nothing else. Closing an
-    already-closed issue is a no-op on GitHub's side.
-  - `distill`/`rework`/`propose` are still placeholders.
+  that `schedule`/`workflow_dispatch` runs do not, and that
+  `schedule`/`workflow_dispatch` runs carry `capacity_query`/`queue_query`/
+  `review_limit`. `actions/telegram-notify` (#46) backs the reporting step in
+  every job; a missing `chat_id`/`bot_token` is a no-op, and a delivery
+  failure never fails the calling job.
+  - `actions/proposal` is one composite action wrapping one CLI,
+    `proposal.py <mode> --flag value` (Homebrew-style subcommands),
+    so `dequeue`/`list-fields`/`propose`/`apply`/`reject` share transport
+    (`gh api graphql --input -` with a full JSON body, not per-variable
+    `-f`/`-F` flags — several modes need list/object-shaped variables that
+    `-f`/`-F` cannot express), field-discovery, and mutation helpers
+    instead of duplicating them per action. `--github-token` is not a
+    flag; it's read from `GH_TOKEN` so it never appears in argv.
+    - `apply` copies the proposal's `title`/`body` onto the parent
+      unconditionally, plus every proposal Issue Field whose name starts
+      with `prefix` onto the same-named Issue Field on the parent (the
+      proposal's native sub-issue `parent`), via `setIssueFieldValue`.
+      `type`, `parent`, and `labels` are reserved stripped names handled
+      via `updateIssueIssueType`, `addSubIssue`, and
+      `addLabelsToLabelable` respectively rather than a generic field
+      write. An empty/unset proposal field (title/body included) leaves
+      the parent's field untouched, by omitting that key from the
+      mutation's input object rather than passing an explicit `null` —
+      confirmed live which of the two actually leaves a field untouched,
+      not assumed. Applying closes the proposal and every open sibling
+      proposal of the same parent (other sub-issues whose Issue Type
+      matches `proposal_type_name`). Re-running against an already-closed
+      proposal is a no-op.
+    - `reject` closes the proposal — nothing else. Closing an
+      already-closed issue is a no-op on GitHub's side.
+    - `dequeue` (#55) checks `capacity_query` against `review_limit`, and
+      if there's room, runs `queue_query` and takes its first element.
+      Both queries are consumer-owned GraphQL text; extraction is a
+      recursive walk of the response matching alias name
+      (`capacity`/`queue`) and disambiguated by value type (scalar vs.
+      array), not schema-aware — zero or more than one match for either
+      alias is a hard error. Only one candidate is ever dequeued per run,
+      so no pagination state is needed between runs. Capacity accounting
+      once a proposal exists and excluding issues that already have one
+      are both the consumer's responsibility (via their own
+      `capacity_query`/`queue_query` definitions), not enforced here.
+    - `list-fields` discovers Issue Fields in a repository whose name
+      starts with `prefix`, stripped, plus the always-available fixed set
+      (`title`, `body`, `type`, `parent`, `labels`) — the menu a caller
+      (in the future, an agent) picks from.
+    - `propose` creates a proposal issue against a parent: resolves the
+      Issue Type, creates the sub-issue, fills every discovered custom
+      field with a trivial type-appropriate mock value (`propose` does
+      not read regulations or call a model yet — real agent judgment is
+      tracked in #11), and posts the control comment
+      (`CONTROL_COMMENT_BODY`) as the first comment.
+    - `distill`/`rework` remain placeholders.
 
 ## Engineering rules
 

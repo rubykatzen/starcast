@@ -1,0 +1,26 @@
+name: Proposal (dogfood)
+on:
+  issue_comment:
+    types: [edited]
+  workflow_dispatch:
+jobs:
+  # This queue_query is a minimal dogfood/testing example, not a template to
+  # copy verbatim: it scopes candidates to untyped issues (filterBy: {type:
+  # null}) so propose doesn't pick up this repo's own typed tracking issues,
+  # but it still does not exclude issues that already have an open sibling
+  # proposal, which #55 explicitly leaves to each consumer's own query to
+  # encode.
+  handle:
+    uses: ./.github/workflows/proposal-shared.yml
+    with:
+      regulations_repo: rubykatzen/starcast
+      regulations_path: AGENTS.md
+      issue_number: ${{ github.event.issue.number }}
+      comment_id: ${{ github.event.comment.id }}
+      capacity_query: >-
+        query { repository(owner: "rubykatzen", name: "starcast") { issues(states: OPEN, filterBy: {type: "Proposal"}) { capacity: totalCount } } }
+      queue_query: >-
+        query { repository(owner: "rubykatzen", name: "starcast") { issues(states: OPEN, filterBy: {type: null}, first: 5, orderBy: {field: CREATED_AT, direction: ASC}) { queue: nodes { id number } } } }
+      review_limit: 1
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
