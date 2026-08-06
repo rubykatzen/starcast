@@ -38,6 +38,22 @@ The control comment's exact template is defined once here
 creation. Verifying that a later `apply`/`reject` truly acts on *that*
 comment (as opposed to some other comment containing matching text) is
 tracked separately in #63 -- not yet enforced here.
+
+## Transitioning a controlling entity (#69)
+
+`propose`/`apply` optionally transition whatever "controlling entity"
+tracks an issue's state (e.g. a ProjectV2Item) as the issue moves
+through the lifecycle -- incoming to review on `propose`, review to
+done on `apply`. Three independently optional consumer-owned GraphQL
+pieces, same philosophy as capacity_query/queue_query: `--entity-query`
+resolves the entity id (must alias exactly one scalar as `entity`, same
+alias+type-disambiguated extraction as `capacity`/`queue`) given an
+`issueId` variable; `--transition-mutation` is then run with `issueId`
+and (if resolved) `entityId` as variables. Omitting the mutation is a
+no-op -- the entity is never touched. A *configured* transition that
+fails after a successful create/apply is a hard error, not swallowed:
+the action succeeded but the entity's state is now stale, and
+continuing silently risks the next dequeue re-selecting the same issue.
 """
 
 import argparse
@@ -412,6 +428,42 @@ def add_comment(issue_id: str, body: str) -> None:
     )
 
 
+# ------------------------------------------------ entity transition (#69)
+
+def is_id_scalar(value: object) -> bool:
+    return isinstance(value, str) and bool(value)
+
+
+def resolve_entity_id(entity_query: str, issue_id: str) -> str | None:
+    """Resolve the controlling entity's id for `issue_id` via consumer text.
+
+    Mirrors capacity_query/queue_query's extraction exactly: the query
+    must alias exactly one scalar field as `entity`, found by the same
+    alias-name + value-type recursive search. Returns None if
+    entity_query is empty -- callers treat that as "no entity to thread
+    through," not an error.
+    """
+    if not entity_query:
+        return None
+    data = gh_graphql(entity_query, issueId=issue_id)
+    return extract_one(data, "entity", is_id_scalar, "--entity-query")
+
+
+def run_transition_mutation(mutation_text: str, issue_id: str, entity_id: str | None) -> None:
+    """Run a consumer-owned transition mutation, if configured.
+
+    Both `issueId` and `entityId` are always supplied as variables --
+    GraphQL only requires an operation's *declared* variables to be
+    used, not every key present in the variables payload, so the
+    consumer's mutation just declares whichever of the two it needs.
+    A no-op when mutation_text is empty: the controlling entity, if
+    any, is left untouched.
+    """
+    if not mutation_text:
+        return
+    gh_graphql(mutation_text, issueId=issue_id, entityId=entity_id)
+
+
 # ------------------------------------------------------------- dequeue mode
 
 def cmd_dequeue(args: argparse.Namespace) -> None:
@@ -529,10 +581,19 @@ def cmd_propose(args: argparse.Namespace) -> None:
 
     add_comment(proposal["id"], CONTROL_COMMENT_BODY)
 
+    transitioned = "no"
+    if args.transition_mutation:
+        entity_id = resolve_entity_id(args.entity_query, args.parent_issue_id)
+        run_transition_mutation(args.transition_mutation, args.parent_issue_id, entity_id)
+        transitioned = f"yes (entity={entity_id})" if entity_id else "yes (no entity)"
+
     write_output(
         result="proposed",
         issue_id=proposal["id"],
-        summary=f"created {owner}/{name}#{proposal['number']} for parent #{parent['number']}; mocked fields={','.join(filled) if filled else '(none)'}",
+        summary=(
+            f"created {owner}/{name}#{proposal['number']} for parent #{parent['number']}; "
+            f"mocked fields={','.join(filled) if filled else '(none)'}; transitioned={transitioned}"
+        ),
     )
 
 
@@ -755,13 +816,20 @@ def cmd_apply(args: argparse.Namespace) -> None:
         close_issue(sibling["id"])
         closed_numbers.append(sibling["number"])
 
+    transitioned = "no"
+    if args.transition_mutation:
+        entity_id = resolve_entity_id(args.entity_query, parent_id)
+        run_transition_mutation(args.transition_mutation, parent_id, entity_id)
+        transitioned = f"yes (entity={entity_id})" if entity_id else "yes (no entity)"
+
     write_output(
         result="applied",
         issue_id=parent_id,
         summary=(
             f"parent={parent_owner}/{parent_name}#{parent['number']}; "
             f"fields={','.join(applied) if applied else '(none)'}; "
-            f"closed={','.join('#' + str(n) for n in closed_numbers)}"
+            f"closed={','.join('#' + str(n) for n in closed_numbers)}; "
+            f"transitioned={transitioned}"
         ),
     )
 
@@ -808,6 +876,8 @@ def build_parser() -> argparse.ArgumentParser:
     propose.add_argument("--repository-id", default=None)
     propose.add_argument("--prefix", default=DEFAULT_PREFIX)
     propose.add_argument("--type", default=DEFAULT_PROPOSAL_TYPE)
+    propose.add_argument("--entity-query", default=None, help="resolves the controlling entity's id (#69); optional")
+    propose.add_argument("--transition-mutation", default=None, help="moves the controlling entity incoming -> review (#69); optional")
     propose.set_defaults(func=cmd_propose)
 
     apply_ = subparsers.add_parser("apply", help="copy a proposal's fields onto its parent and close it")
@@ -815,6 +885,8 @@ def build_parser() -> argparse.ArgumentParser:
     apply_.add_argument("--issue-number", required=True)
     apply_.add_argument("--prefix", default=DEFAULT_PREFIX)
     apply_.add_argument("--type", default=DEFAULT_PROPOSAL_TYPE)
+    apply_.add_argument("--entity-query", default=None, help="resolves the controlling entity's id (#69); optional")
+    apply_.add_argument("--transition-mutation", default=None, help="moves the controlling entity review -> done (#69); optional")
     apply_.set_defaults(func=cmd_apply)
 
     reject = subparsers.add_parser("reject", help="close a proposal, nothing else")

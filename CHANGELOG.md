@@ -27,6 +27,15 @@
     (below), now reached via `mode: apply`/`mode: reject`.
 - `proposal-shared.yml`'s `propose` job now dequeues a candidate and
   creates a (mocked) proposal for it, instead of a placeholder notice.
+- `entity_query`, `propose_transition_mutation`, and
+  `apply_transition_mutation` inputs on `proposal-shared.yml`: optionally
+  transition whatever "controlling entity" tracks an issue's state (e.g.
+  a `ProjectV2Item`) as it moves through the lifecycle — incoming to
+  review on `propose`, review to done on `apply` (#69). All three are
+  independently optional consumer-owned GraphQL text; `entity_query` uses
+  the same alias+type extraction as `capacity`/`queue`. A configured
+  transition mutation that fails after a successful create/apply is a
+  hard error, not swallowed.
 
 ### Changed
 

@@ -44,6 +44,18 @@ on:
         description: 'Maximum number of issues allowed in review at once. Required for schedule/workflow_dispatch runs (see #55)'
         required: false
         type: number
+      entity_query:
+        description: 'GraphQL query text; must alias exactly one scalar field as `entity` (e.g. a ProjectV2Item id). Optional (see #69)'
+        required: false
+        type: string
+      propose_transition_mutation:
+        description: 'GraphQL mutation text run after a proposal is created, moving the controlling entity incoming -> review. Optional -- omit for no transition step (see #69)'
+        required: false
+        type: string
+      apply_transition_mutation:
+        description: 'GraphQL mutation text run after Apply succeeds, moving the controlling entity review -> done. Optional -- omit for no transition step (see #69)'
+        required: false
+        type: string
     secrets:
       token:
         description: 'Token with write access to issues, sub-issues, and Issue Fields on the parent and proposal repositories'
@@ -98,6 +110,8 @@ jobs:
           issue_number: ${{ inputs.issue_number }}
           prefix: ${{ inputs.prefix }}
           proposal_type_name: ${{ inputs.proposal_type_name }}
+          entity_query: ${{ inputs.entity_query }}
+          apply_transition_mutation: ${{ inputs.apply_transition_mutation }}
           github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
@@ -214,6 +228,8 @@ jobs:
           parent_issue_id: ${{ steps.dequeue.outputs.issue_id }}
           prefix: ${{ inputs.prefix }}
           proposal_type_name: ${{ inputs.proposal_type_name }}
+          entity_query: ${{ inputs.entity_query }}
+          propose_transition_mutation: ${{ inputs.propose_transition_mutation }}
           github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
