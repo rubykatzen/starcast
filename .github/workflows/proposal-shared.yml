@@ -91,7 +91,7 @@ jobs:
     steps:
       - name: Apply proposal
         id: apply
-        uses: rubykatzen/starcast/actions/proposal@v0.9
+        uses: rubykatzen/starcast/actions/proposal@v0.5
         with:
           mode: apply
           repository: ${{ github.repository }}
@@ -101,7 +101,7 @@ jobs:
           github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.5
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -121,7 +121,7 @@ jobs:
     steps:
       - name: Reject proposal
         id: reject
-        uses: rubykatzen/starcast/actions/proposal@v0.9
+        uses: rubykatzen/starcast/actions/proposal@v0.5
         with:
           mode: reject
           repository: ${{ github.repository }}
@@ -129,7 +129,7 @@ jobs:
           github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.5
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -154,7 +154,7 @@ jobs:
         run: 'echo "::notice::distill is not implemented yet (see #11, #13)"'
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.5
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -178,7 +178,7 @@ jobs:
         run: 'echo "::notice::rework is not implemented yet (see #11)"'
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.5
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -197,7 +197,7 @@ jobs:
     steps:
       - name: Dequeue next proposal candidate
         id: dequeue
-        uses: rubykatzen/starcast/actions/proposal@v0.9
+        uses: rubykatzen/starcast/actions/proposal@v0.5
         with:
           mode: dequeue
           capacity_query: ${{ inputs.capacity_query }}
@@ -208,7 +208,7 @@ jobs:
       - name: Create proposal
         id: propose
         if: steps.dequeue.outputs.result == 'dequeued'
-        uses: rubykatzen/starcast/actions/proposal@v0.9
+        uses: rubykatzen/starcast/actions/proposal@v0.5
         with:
           mode: propose
           parent_issue_id: ${{ steps.dequeue.outputs.issue_id }}
@@ -217,7 +217,7 @@ jobs:
           github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.5
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
