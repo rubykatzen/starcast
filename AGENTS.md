@@ -95,6 +95,19 @@ commit SHA. Do not recommend `@main` for stable consumers.
       not read regulations or call a model yet — real agent judgment is
       tracked in #11), and posts the control comment
       (`CONTROL_COMMENT_BODY`) as the first comment.
+    - `propose`/`apply` optionally transition whatever "controlling
+      entity" tracks an issue's state (e.g. a `ProjectV2Item`) as it
+      moves through the lifecycle (#69): `entity_query` resolves the
+      entity id given an `issueId` variable, using the same alias+type
+      extraction as `capacity`/`queue` (a scalar aliased `entity`);
+      `propose_transition_mutation`/`apply_transition_mutation` then run
+      with `issueId`/`entityId` as variables (GraphQL only requires an
+      operation's *declared* variables to be used, not every key present
+      in the variables payload, so a mutation just declares whichever it
+      needs). All three inputs are independently optional; omitting a
+      transition mutation is a no-op. A *configured* transition mutation
+      that fails after a successful create/apply is a hard error, not
+      swallowed — it would otherwise leave the entity's state stale.
     - `distill`/`rework` remain placeholders.
 
 ## Engineering rules

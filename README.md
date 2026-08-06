@@ -248,6 +248,20 @@ jobs:
   `prefix`, plus the always-available fixed set (`title`, `body`, `type`,
   `parent`, `labels`) — the menu a caller picks from when deciding what a
   proposal can hold.
+- **Optional entity transitions** (#69) — `Propose`/`Apply` can each move
+  whatever "controlling entity" tracks an issue's state (e.g. a
+  `ProjectV2Item`) as the issue moves through the lifecycle: incoming → review
+  on `Propose`, review → done on `Apply`. Three independently optional
+  consumer-owned GraphQL pieces: `entity_query` resolves the entity's id
+  (given an `issueId` variable, must alias exactly one scalar as `entity` —
+  same alias+type extraction as `capacity`/`queue`), and
+  `propose_transition_mutation`/`apply_transition_mutation` are then run with
+  `issueId`/`entityId` as variables. Omitting a transition mutation is a
+  clean no-op — the entity is never touched, only the issue/proposal. A
+  *configured* transition that fails after a successful create/apply is a
+  hard error, not swallowed — the action already succeeded, so silently
+  continuing would leave the entity's state stale and risk the next
+  `dequeue` re-selecting the same issue.
 - **Self-gating** — `Apply`/`Reject`/`Distill`/`Rework` run only on
   `issue_comment` when the matching checkbox (e.g. `[x] Apply`) is checked;
   `Propose` runs only on `schedule`/`workflow_dispatch`.
@@ -326,14 +340,54 @@ query {
 }
 ```
 
-`ProjectV2.items`'s `query` argument and `ProjectV2Item.content { ... on Issue }`
-were confirmed against GitHub's live GraphQL schema via introspection, not
-assumed. The exact search-string syntax a `query: "status:Review"` filter
-accepts for a custom field wasn't round-tripped end-to-end — this org doesn't
-currently have a Project V2 to test against — so treat that specific string
-as illustrative; the structural point (`capacity`/`queue` aliased under
-`organization.projectV2` rather than `repository`, a genuinely different
-nesting shape) is what's load-bearing here.
+`ProjectV2.items`'s `query` argument (including the `status:<option>`
+search-string syntax), `ProjectV2Item.content { ... on Issue }`, and the
+entity/transition queries below were all round-tripped live against a real
+Project V2 in this org (`rubykatzen`/`Proposal Review`, #1), not just
+schema-checked — see [Entity transitions](#entity-transitions-69) below.
+
+#### Entity transitions (#69)
+
+`entity_query` resolves the id of whatever entity (typically a
+`ProjectV2Item`) tracks an issue's state, given an `issueId` variable —
+same alias+type extraction as `capacity`/`queue`, a scalar aliased `entity`:
+
+```graphql
+query($issueId: ID!) {
+  node(id: $issueId) {
+    ... on Issue {
+      projectItems(first: 10) {
+        nodes { entity: id }
+      }
+    }
+  }
+}
+```
+
+`propose_transition_mutation`/`apply_transition_mutation` then run with
+`$issueId`/`$entityId` as variables — a mutation only needs to declare the
+ones it actually uses; extra keys present in the variables payload but not
+referenced by the mutation text are simply ignored:
+
+```graphql
+mutation($entityId: ID!) {
+  updateProjectV2ItemFieldValue(input: {
+    projectId: "PVT_..."
+    itemId: $entityId
+    fieldId: "PVTSSF_..."
+    value: { singleSelectOptionId: "..." }
+  }) { clientMutationId }
+}
+```
+
+Both queries above were run against a real issue and a real Project item in
+this org during development, not assumed: `entity_query` correctly resolved
+the item id, and the mutation correctly moved its Status field. Note the
+`projectItems` lookup has no project-scoping argument beyond pagination — if
+an issue could belong to more than one Project, a consumer's `entity_query`
+needs its own way to disambiguate (or accept that ambiguity as a hard error,
+same as `capacity`/`queue`), since this simple form doesn't filter by
+project/owner itself.
 
 ## Workflow API
 
