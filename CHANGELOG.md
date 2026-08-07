@@ -16,6 +16,10 @@
     exactly one scalar numeric field as `capacity`, `queue_query` exactly
     one array-valued field as `queue`; both are found by a recursive,
     type-disambiguated alias search rather than a schema-aware mapping.
+    The dequeued candidate's own `id` is found the same recursive way,
+    not a flat lookup — needed for queue shapes where `id` is nested
+    (e.g. a Project-based `queue_query` typically exposes it as
+    `content { ... on Issue { id } }`).
   - `list-fields`: discovers the prefixed proposal Issue Fields available
     in a repository.
   - `propose`: creates a proposal issue against a parent — Issue Type,

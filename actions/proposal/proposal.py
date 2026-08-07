@@ -483,11 +483,19 @@ def cmd_dequeue(args: argparse.Namespace) -> None:
         write_output(result="no-op-empty-queue", issue_id="", summary=f"capacity={capacity} < review_limit={review_limit}, queue is empty")
         return
 
+    # A queue element's `id` may be nested (e.g. a Project-based
+    # queue_query typically exposes it as `content { ... on Issue { id }
+    # }`, not flat) -- found the same way capacity/queue themselves are,
+    # a recursive alias search, not a flat dict lookup.
     candidate = queue[0]
-    issue_id = candidate.get("id") if isinstance(candidate, dict) else None
-    if not issue_id:
-        print("ERROR: queue_query's first queue element has no 'id' field", file=sys.stderr)
+    ids = find_aliased(candidate, "id", is_id_scalar)
+    if len(ids) != 1:
+        print(
+            f"ERROR: queue_query's first queue element must contain exactly one 'id' field (found {len(ids)})",
+            file=sys.stderr,
+        )
         sys.exit(1)
+    issue_id = ids[0]
 
     write_output(result="dequeued", issue_id=issue_id, summary=f"capacity={capacity} < review_limit={review_limit}, dequeued {issue_id}")
 
