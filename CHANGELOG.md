@@ -49,6 +49,20 @@
 - `proposal-shared.yml`'s `validate` job now also requires
   `capacity_query`/`queue_query`/`review_limit` on schedule/
   `workflow_dispatch` runs.
+- `issue_number`/`comment_id` inputs on `proposal-shared.yml` change from
+  `type: number` to `type: string`.
+
+### Fixed
+
+- `proposal-shared.yml`'s `validate` job rejected every schedule/
+  `workflow_dispatch` run: an unset optional `type: number` input
+  resolves to `0` in GitHub Actions, not empty, so
+  `[ -n "${{ inputs.issue_number }}" ]` was always true even when the
+  caller never set it. Never caught before now — this is the first time
+  the workflow was exercised through a real dispatch rather than direct
+  CLI calls against the underlying script. Fixed by switching
+  `issue_number`/`comment_id` to `type: string`, whose unset default is
+  genuinely empty.
 
 ## [v0.8.0] - 2026-08-05
 
