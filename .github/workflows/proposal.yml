@@ -4,12 +4,21 @@ on:
     types: [edited]
   workflow_dispatch:
 jobs:
-  # This queue_query is a minimal dogfood/testing example, not a template to
-  # copy verbatim: it scopes candidates to untyped issues (filterBy: {type:
-  # null}) so propose doesn't pick up this repo's own typed tracking issues,
-  # but it still does not exclude issues that already have an open sibling
-  # proposal, which #55 explicitly leaves to each consumer's own query to
-  # encode.
+  # capacity/queue are sourced from the "Proposal" Project
+  # (https://github.com/orgs/rubykatzen/projects/1), not this repo's issue
+  # list: queue_query only ever finds issues explicitly added to that
+  # Project's Incoming column, which fully isolates what this dogfood
+  # caller can touch. entity_query/the two transition mutations move an
+  # item between the Project's Incoming/Review/Done columns as it moves
+  # through the lifecycle (#69). Moving an item to Done also auto-closes
+  # its issue -- that's a GitHub Projects built-in workflow bound to the
+  # column, not something this repo's code does, and it's left as-is
+  # deliberately since "applied" and "closed" line up here.
+  #
+  # secrets.GITHUB_TOKEN cannot mutate Projects V2 (no such permission
+  # scope exists for the auto-provisioned token) -- this caller needs a
+  # real PAT with organization Projects read/write, stored as
+  # PROJECTS_TOKEN.
   handle:
     uses: ./.github/workflows/proposal-shared.yml
     with:
@@ -18,9 +27,15 @@ jobs:
       issue_number: ${{ github.event.issue.number }}
       comment_id: ${{ github.event.comment.id }}
       capacity_query: >-
-        query { repository(owner: "rubykatzen", name: "starcast") { issues(states: OPEN, filterBy: {type: "Proposal"}) { capacity: totalCount } } }
+        query { organization(login: "rubykatzen") { projectV2(number: 1) { items(query: "status:Review") { capacity: totalCount } } } }
       queue_query: >-
-        query { repository(owner: "rubykatzen", name: "starcast") { issues(states: OPEN, filterBy: {type: null}, first: 5, orderBy: {field: CREATED_AT, direction: ASC}) { queue: nodes { id number } } } }
+        query { organization(login: "rubykatzen") { projectV2(number: 1) { items(first: 5, query: "status:Incoming") { queue: nodes { content { ... on Issue { id } } } } } } }
       review_limit: 1
+      entity_query: >-
+        query($issueId: ID!) { node(id: $issueId) { ... on Issue { projectItems(first: 10) { nodes { entity: id } } } } }
+      propose_transition_mutation: >-
+        mutation($entityId: ID!) { updateProjectV2ItemFieldValue(input: {projectId: "PVT_kwDOD5LpBM4Bfjz_", itemId: $entityId, fieldId: "PVTSSF_lADOD5LpBM4Bfjz_zhZ13FI", value: {singleSelectOptionId: "47fc9ee4"}}) { clientMutationId } }
+      apply_transition_mutation: >-
+        mutation($entityId: ID!) { updateProjectV2ItemFieldValue(input: {projectId: "PVT_kwDOD5LpBM4Bfjz_", itemId: $entityId, fieldId: "PVTSSF_lADOD5LpBM4Bfjz_zhZ13FI", value: {singleSelectOptionId: "98236657"}}) { clientMutationId } }
     secrets:
-      token: ${{ secrets.GITHUB_TOKEN }}
+      token: ${{ secrets.PROJECTS_TOKEN }}
