@@ -70,6 +70,9 @@ permissions:
   issues: write
   contents: write
   pull-requests: write
+# actions/proposal is pinned to @main below, not a version tag, while v0.9.0
+# is still unreleased -- switch back to @v0.9 (matching route-issue-shared.yml's
+# own pinned-tag pattern for its sibling action) once that tag exists.
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -103,7 +106,7 @@ jobs:
     steps:
       - name: Apply proposal
         id: apply
-        uses: rubykatzen/starcast/actions/proposal@v0.9
+        uses: rubykatzen/starcast/actions/proposal@main
         with:
           mode: apply
           repository: ${{ github.repository }}
@@ -135,7 +138,7 @@ jobs:
     steps:
       - name: Reject proposal
         id: reject
-        uses: rubykatzen/starcast/actions/proposal@v0.9
+        uses: rubykatzen/starcast/actions/proposal@main
         with:
           mode: reject
           repository: ${{ github.repository }}
@@ -211,7 +214,7 @@ jobs:
     steps:
       - name: Dequeue next proposal candidate
         id: dequeue
-        uses: rubykatzen/starcast/actions/proposal@v0.9
+        uses: rubykatzen/starcast/actions/proposal@main
         with:
           mode: dequeue
           capacity_query: ${{ inputs.capacity_query }}
@@ -222,7 +225,7 @@ jobs:
       - name: Create proposal
         id: propose
         if: steps.dequeue.outputs.result == 'dequeued'
-        uses: rubykatzen/starcast/actions/proposal@v0.9
+        uses: rubykatzen/starcast/actions/proposal@main
         with:
           mode: propose
           parent_issue_id: ${{ steps.dequeue.outputs.issue_id }}
