@@ -118,7 +118,7 @@ jobs:
           github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.7
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -146,7 +146,7 @@ jobs:
           github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.7
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -171,7 +171,7 @@ jobs:
         run: 'echo "::notice::distill is not implemented yet (see #11, #13)"'
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.7
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -195,7 +195,7 @@ jobs:
         run: 'echo "::notice::rework is not implemented yet (see #11)"'
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.7
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -236,7 +236,7 @@ jobs:
           github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: rubykatzen/starcast/actions/telegram-notify@v0.7
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}

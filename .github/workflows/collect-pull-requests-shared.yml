@@ -28,7 +28,7 @@ jobs:
   collect:
     runs-on: ubuntu-latest
     steps:
-      - uses: rubykatzen/starcast/actions/collect-pull-requests@v0.5
+      - uses: rubykatzen/starcast/actions/collect-pull-requests@v0.7
         with:
           organizations: ${{ inputs.organizations }}
           repositories: ${{ inputs.repositories }}
