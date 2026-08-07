@@ -23,11 +23,11 @@ on:
       issue_number:
         description: 'Number of the proposal issue; required for issue_comment-triggered runs, must be absent for schedule/workflow_dispatch runs'
         required: false
-        type: number
+        type: string
       comment_id:
         description: 'Id of the triggering comment; required for issue_comment-triggered runs, must be absent for schedule/workflow_dispatch runs'
         required: false
-        type: number
+        type: string
       telegram_chat_id:
         description: 'Telegram chat id to report triggered actions and outcomes to; omit to disable reporting (see #46)'
         required: false
