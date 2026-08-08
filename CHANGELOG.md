@@ -40,6 +40,13 @@
   the same alias+type extraction as `capacity`/`queue`. A configured
   transition mutation that fails after a successful create/apply is a
   hard error, not swallowed.
+- `check-control-comment` mode on `actions/proposal`, run by
+  `proposal-shared.yml`'s `validate` job on `issue_comment` runs before
+  `apply`/`reject`/`distill`/`rework` act: verifies the triggering
+  comment is actually the proposal's first/control comment, not just any
+  comment containing matching checkbox text (#63). A mismatch is a hard
+  error. Success adds a 👀 reaction to the comment, mirroring the
+  Copilot coding agent's own acknowledgment convention.
 
 ### Changed
 

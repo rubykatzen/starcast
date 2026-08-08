@@ -46,9 +46,15 @@ commit SHA. Do not recommend `@main` for stable consumers.
   enforces that `issue_comment` runs carry `issue_number`/`comment_id` and
   that `schedule`/`workflow_dispatch` runs do not, and that
   `schedule`/`workflow_dispatch` runs carry `capacity_query`/`queue_query`/
-  `review_limit`. `actions/telegram-notify` (#46) backs the reporting step in
-  every job; a missing `chat_id`/`bot_token` is a no-op, and a delivery
-  failure never fails the calling job.
+  `review_limit`. On `issue_comment` runs, `validate` also verifies the
+  triggering comment is actually the proposal's first/control comment
+  (#63) via `mode: check-control-comment`, shared here rather than
+  duplicated across `apply`/`reject`/`distill`/`rework` since all four
+  already depend on this job; a mismatch is a hard error, not a silent
+  no-op, and success marks the comment 👀. `actions/telegram-notify`
+  (#46) backs the reporting step in every job; a missing
+  `chat_id`/`bot_token` is a no-op, and a delivery failure never fails
+  the calling job.
   - `actions/proposal` is one composite action wrapping one CLI,
     `proposal.py <mode> --flag value` (Homebrew-style subcommands),
     so `dequeue`/`list-fields`/`propose`/`apply`/`reject` share transport
@@ -108,6 +114,12 @@ commit SHA. Do not recommend `@main` for stable consumers.
       transition mutation is a no-op. A *configured* transition mutation
       that fails after a successful create/apply is a hard error, not
       swallowed — it would otherwise leave the entity's state stale.
+    - `check-control-comment` (#63) resolves the issue's actual first
+      comment (by `databaseId`, matching `github.event.comment.id`'s
+      numeric form) and compares it against the id the caller supplied;
+      a mismatch is a hard error. Success adds a 👀 reaction to it and
+      leaves the reaction in place — a persistent record, not removed on
+      completion.
     - `distill`/`rework` remain placeholders.
 
 ## Engineering rules

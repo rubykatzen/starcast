@@ -95,6 +95,20 @@ jobs:
               exit 1
             fi
           fi
+      # Verifies the triggering comment is the proposal's actual first/
+      # control comment, not just any comment containing matching checkbox
+      # text (#63). Shared here rather than duplicated in apply/reject/
+      # distill/rework, since all four already depend on this job. Marks
+      # the comment 👀 on success.
+      - name: Verify control comment
+        if: github.event_name == 'issue_comment'
+        uses: rubykatzen/starcast/actions/proposal@main
+        with:
+          mode: check-control-comment
+          repository: ${{ github.repository }}
+          issue_number: ${{ inputs.issue_number }}
+          comment_id: ${{ inputs.comment_id }}
+          github_token: ${{ secrets.token }}
 
   apply:
     needs: validate

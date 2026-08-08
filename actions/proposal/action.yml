@@ -2,13 +2,16 @@ name: 'Proposal'
 description: 'Unified CLI for the proposal lifecycle: dequeue, list-fields, propose, apply, reject (#11, #55)'
 inputs:
   mode:
-    description: '"dequeue", "list-fields", "propose", "apply", or "reject"'
+    description: '"dequeue", "list-fields", "propose", "apply", "reject", or "check-control-comment"'
     required: true
   repository:
-    description: '"owner/repo" (list-fields, apply, reject)'
+    description: '"owner/repo" (list-fields, apply, reject, check-control-comment)'
     required: false
   issue_number:
-    description: 'Proposal issue number (apply, reject)'
+    description: 'Proposal issue number (apply, reject, check-control-comment)'
+    required: false
+  comment_id:
+    description: 'Id of the comment to verify is the proposal''s first/control comment (check-control-comment; see #63)'
     required: false
   parent_issue_id:
     description: 'GraphQL node id of the issue to propose against (propose)'
@@ -65,6 +68,7 @@ runs:
         MODE: ${{ inputs.mode }}
         REPOSITORY: ${{ inputs.repository }}
         ISSUE_NUMBER: ${{ inputs.issue_number }}
+        COMMENT_ID: ${{ inputs.comment_id }}
         PARENT_ISSUE_ID: ${{ inputs.parent_issue_id }}
         CAPACITY_QUERY: ${{ inputs.capacity_query }}
         QUEUE_QUERY: ${{ inputs.queue_query }}
@@ -91,6 +95,9 @@ runs:
             ;;
           reject)
             args+=(--repository "$REPOSITORY" --issue-number "$ISSUE_NUMBER")
+            ;;
+          check-control-comment)
+            args+=(--repository "$REPOSITORY" --issue-number "$ISSUE_NUMBER" --comment-id "$COMMENT_ID")
             ;;
           *)
             echo "::error::unknown mode '$MODE'"
