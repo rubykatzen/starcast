@@ -239,11 +239,14 @@ jobs:
   in regulation-constrained judgment is tracked in #11. `Distill`/`Rework`
   remain placeholders.
 - **The control comment has one fixed template**, posted by `Propose`
-  immediately after creation and gated on by `Apply`/`Reject`/`Distill`/
-  `Rework`: `- [ ] Apply`, `- [ ] Reject`, `- [ ] Distill`, `- [ ] Rework`,
-  nothing else. Verifying that a triggering comment actually *is* a given
-  proposal's control comment (as opposed to some other comment containing
-  matching text) isn't enforced yet — tracked in #63.
+  immediately after creation: `- [ ] Apply`, `- [ ] Reject`,
+  `- [ ] Distill`, `- [ ] Rework`, nothing else. Before `Apply`/`Reject`/
+  `Distill`/`Rework` run, `validate` verifies the triggering comment is
+  actually the proposal's *first* comment — not just any comment
+  containing matching checkbox text — and hard-errors if it isn't (#63).
+  On success it marks the comment with a 👀 reaction, left in place
+  afterward, mirroring the Copilot coding agent's own acknowledgment
+  convention.
 - **`list-fields`** discovers which Issue Fields in a repository start with
   `prefix`, plus the always-available fixed set (`title`, `body`, `type`,
   `parent`, `labels`) — the menu a caller picks from when deciding what a

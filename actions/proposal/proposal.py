@@ -428,6 +428,20 @@ def add_comment(issue_id: str, body: str) -> None:
     )
 
 
+def add_reaction(subject_id: str, content: str) -> None:
+    gh_graphql(
+        """
+        mutation($subjectId: ID!, $content: ReactionContent!) {
+          addReaction(input: {subjectId: $subjectId, content: $content}) {
+            clientMutationId
+          }
+        }
+        """,
+        subjectId=subject_id,
+        content=content,
+    )
+
+
 # ------------------------------------------------ entity transition (#69)
 
 def is_id_scalar(value: object) -> bool:
@@ -842,6 +856,74 @@ def cmd_apply(args: argparse.Namespace) -> None:
     )
 
 
+# ------------------------------------------- check-control-comment mode (#63)
+
+def fetch_first_comment(owner: str, name: str, issue_number: int) -> dict | None:
+    data = gh_graphql(
+        """
+        query($owner: String!, $name: String!, $number: Int!) {
+          repository(owner: $owner, name: $name) {
+            issue(number: $number) {
+              comments(first: 1) {
+                nodes { id databaseId }
+              }
+            }
+          }
+        }
+        """,
+        owner=owner,
+        name=name,
+        number=issue_number,
+    )
+    repository = data["repository"]
+    if repository is None:
+        print(f"ERROR: repository '{owner}/{name}' not found or inaccessible", file=sys.stderr)
+        sys.exit(1)
+    issue = repository["issue"]
+    if issue is None:
+        print(f"ERROR: issue #{issue_number} not found in {owner}/{name}", file=sys.stderr)
+        sys.exit(1)
+    nodes = issue["comments"]["nodes"]
+    return nodes[0] if nodes else None
+
+
+def cmd_check_control_comment(args: argparse.Namespace) -> None:
+    """Verify the triggering comment is the proposal's control comment (#63).
+
+    The control comment is identified structurally -- the issue's first
+    comment, posted by `propose` immediately after creation, before any
+    other mutation -- not by matching its text. A comment containing the
+    right checkbox text but posted later is not the control comment, and
+    acting on it would be a spurious trigger; this is a hard error, not
+    a silent no-op, so a human notices via the failed run rather than
+    wondering why nothing happened.
+
+    On success, marks the comment with a 👀 reaction -- "an executor has
+    picked this up," mirroring the Copilot coding agent's own
+    acknowledgment convention. Left in place afterward, as a persistent
+    record, not removed on completion.
+    """
+    owner, name = args.repository.split("/")
+    issue_number = int(args.issue_number)
+    comment_id = int(args.comment_id)
+
+    first_comment = fetch_first_comment(owner, name, issue_number)
+    if first_comment is None or first_comment["databaseId"] != comment_id:
+        print(
+            f"ERROR: comment {comment_id} is not {owner}/{name}#{issue_number}'s control "
+            "comment (its first comment) -- refusing to act on it",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    add_reaction(first_comment["id"], "EYES")
+    write_output(
+        result="verified",
+        issue_id=first_comment["id"],
+        summary=f"{owner}/{name}#{issue_number} comment {comment_id} confirmed as control comment",
+    )
+
+
 # --------------------------------------------------------------- reject mode
 
 def cmd_reject(args: argparse.Namespace) -> None:
@@ -901,6 +983,15 @@ def build_parser() -> argparse.ArgumentParser:
     reject.add_argument("--repository", required=True)
     reject.add_argument("--issue-number", required=True)
     reject.set_defaults(func=cmd_reject)
+
+    check_control_comment = subparsers.add_parser(
+        "check-control-comment",
+        help="verify a comment is the proposal's first/control comment, then mark it picked up (#63)",
+    )
+    check_control_comment.add_argument("--repository", required=True)
+    check_control_comment.add_argument("--issue-number", required=True)
+    check_control_comment.add_argument("--comment-id", required=True)
+    check_control_comment.set_defaults(func=cmd_check_control_comment)
 
     return parser
 
