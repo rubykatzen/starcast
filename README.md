@@ -247,6 +247,26 @@ jobs:
   On success it marks the comment with a 👀 reaction, left in place
   afterward, mirroring the Copilot coding agent's own acknowledgment
   convention.
+- **Known limits of Markdown checkboxes as the control surface** (#11) —
+  accepted for now, revisit if they become a real problem:
+  - No native "click" signal: checking a box and directly editing the
+    comment's raw text both fire the same `issue_comment: edited` event.
+    There's no way to distinguish a genuine UI click from a hand-edited
+    `[x]`.
+  - No mutual exclusivity: nothing stops a human from checking more than
+    one box in the same edit. `Apply` and `Reject` sharing a
+    `comment_id`-keyed concurrency group means both would run —
+    sequentially, in an unspecified order — rather than being rejected
+    as an ambiguous input.
+  - No delta signal: any edit to the comment (even unrelated text) fires
+    the same event; the workflow always re-derives intent from the
+    comment's current full body, not what changed.
+  - A GitHub App using the Checks API's `actions` (real buttons, each
+    click delivering an unambiguous `check_run.requested_action`
+    webhook with an `identifier`) would remove all three limits by
+    construction, at the cost of needing a real webhook-receiving
+    server rather than only reusable Actions workflows — out of scope
+    for now; tracked as a research question in #84.
 - **`list-fields`** discovers which Issue Fields in a repository start with
   `prefix`, plus the always-available fixed set (`title`, `body`, `type`,
   `parent`, `labels`) — the menu a caller picks from when deciding what a
