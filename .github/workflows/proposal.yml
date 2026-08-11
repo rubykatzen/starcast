@@ -23,7 +23,7 @@ jobs:
     uses: ./.github/workflows/proposal-shared.yml
     with:
       regulations_repo: rubykatzen/starcast
-      regulations_path: AGENTS.md
+      regulations_path: TRANSLATE.md
       issue_number: ${{ github.event.issue.number }}
       comment_id: ${{ github.event.comment.id }}
       capacity_query: >-
