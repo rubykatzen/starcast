@@ -26,12 +26,18 @@ empty/unset proposal field means "leave the parent's field untouched."
 repository (so a caller -- in the future, an agent -- knows what it can
 fill in), and `propose` creates the proposal issue itself.
 
-`propose` is mocked in this version: it does not read regulations or
-call a model. It fills every discovered field with a trivial
-type-appropriate placeholder value and creates the proposal exactly as
-a real decision-maker eventually would, so the mechanical pipeline
-(creation, field writes, control comment) is fully exercised ahead of
-wiring in real agent judgment.
+`propose` does not decide content itself -- that's real agent
+judgment, out of scope for a deterministic script. It takes a
+`--model-response` JSON blob (`{"title": ..., "body": ...,
+"fields": {...}}`) and does only the mechanical part: creates the
+issue, writes the given field values, posts the control comment. The
+`propose-context` mode is the other half: it gathers everything a
+model needs to produce that JSON -- regulations text, the candidate
+issue's title/body, and the catalog of fields available to fill in --
+as one self-contained prompt, so a caller can hand it straight to a
+model (e.g. via `actions/ai-inference` wrapping GitHub Copilot CLI) and
+feed the raw response back into `propose --model-response` without
+either mode needing to know about the other's transport.
 
 The control comment's exact template is defined once here
 (CONTROL_COMMENT_BODY) and posted by `propose` immediately after
@@ -62,8 +68,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime as dt
-from datetime import timezone
+import uuid
 
 DEFAULT_PREFIX = "Proposal "
 DEFAULT_PROPOSAL_TYPE = "Proposal"
@@ -104,11 +109,20 @@ def gh_graphql(query: str, **variables: object) -> dict:
 
 
 def write_output(**fields: str) -> None:
-    lines = "".join(f"{key}={value}\n" for key, value in fields.items())
+    """Write step outputs, safe for multiline values (e.g. `prompt`).
+
+    A plain `key=value\\n` line breaks if `value` itself contains a
+    newline -- GITHUB_OUTPUT would parse the continuation as new,
+    unrelated key=value pairs. Uses the delimiter form GitHub documents
+    for multiline values (`key<<DELIM\\nvalue\\nDELIM\\n`) unconditionally,
+    since it's valid for single-line values too.
+    """
     output_path = os.environ.get("GITHUB_OUTPUT")
     if output_path:
         with open(output_path, "a", encoding="utf-8") as f:
-            f.write(lines)
+            for key, value in fields.items():
+                delimiter = f"ghadelimiter_{uuid.uuid4().hex}"
+                f.write(f"{key}<<{delimiter}\n{value}\n{delimiter}\n")
     summary = "### proposal\n\n" + "".join(f"- {k}: {v}\n" for k, v in fields.items())
     print(summary)
     step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -294,23 +308,20 @@ def build_field_input(field: dict, value: str | None, names: list[str] | None) -
     return payload
 
 
-def mock_value_for(field: dict) -> tuple[str | None, list[str] | None]:
-    """A trivial, type-appropriate placeholder -- stands in for a real
-    agent decision (#11's Propose is agent work; this tool mocks it)."""
+def model_value_for_field(field: dict, raw: object) -> tuple[str | None, list[str] | None]:
+    """Convert one `--model-response` "fields" entry into build_field_input's
+    (value, names) shape, based on the field's actual data type -- the
+    model always writes a plain string (or, for MULTI_SELECT, a list of
+    strings); this is not a second copy of the model's judgment, just a
+    shape adapter.
+    """
     data_type = field["dataType"]
-    if data_type == "TEXT":
-        return f"Test {field['name']}", None
-    if data_type == "NUMBER":
-        return "0", None
-    if data_type == "DATE":
-        return dt.now(tz=timezone.utc).date().isoformat(), None
-    if data_type == "SINGLE_SELECT":
-        options = field.get("options") or []
-        return None, [options[0]["name"]] if options else None
     if data_type == "MULTI_SELECT":
-        options = field.get("options") or []
-        return None, [options[0]["name"]] if options else None
-    return None, None
+        names = raw if isinstance(raw, list) else [raw]
+        return None, [str(n) for n in names]
+    if data_type == "SINGLE_SELECT":
+        return None, [str(raw)]
+    return str(raw), None
 
 
 # -------------------------------------------------------------- mutations
@@ -536,14 +547,7 @@ def cmd_list_fields(args: argparse.Namespace) -> None:
 
 # -------------------------------------------------------------- propose mode
 
-def cmd_propose(args: argparse.Namespace) -> None:
-    """Create a proposal against args.parent_issue_id.
-
-    Mocked per #11/discussion: fills a trivial type-appropriate
-    placeholder for every discovered custom field instead of calling a
-    model. The mechanical pipeline (creation, field writes, control
-    comment) is real; only the *content* is a stand-in.
-    """
+def resolve_parent(parent_issue_id: str) -> dict:
     data = gh_graphql(
         """
         query($id: ID!) {
@@ -555,12 +559,156 @@ def cmd_propose(args: argparse.Namespace) -> None:
           }
         }
         """,
-        id=args.parent_issue_id,
+        id=parent_issue_id,
     )
     parent = data["node"]
     if parent is None:
-        print(f"ERROR: parent issue '{args.parent_issue_id}' not found", file=sys.stderr)
+        print(f"ERROR: parent issue '{parent_issue_id}' not found", file=sys.stderr)
         sys.exit(1)
+    return parent
+
+
+def fetch_issue_title_body(owner: str, name: str, number: int) -> tuple[str, str]:
+    data = gh_graphql(
+        """
+        query($owner: String!, $name: String!, $number: Int!) {
+          repository(owner: $owner, name: $name) {
+            issue(number: $number) { title body }
+          }
+        }
+        """,
+        owner=owner,
+        name=name,
+        number=number,
+    )
+    repository = data["repository"]
+    if repository is None:
+        print(f"ERROR: repository '{owner}/{name}' not found or inaccessible", file=sys.stderr)
+        sys.exit(1)
+    issue = repository["issue"]
+    if issue is None:
+        print(f"ERROR: issue #{number} not found in {owner}/{name}", file=sys.stderr)
+        sys.exit(1)
+    return issue["title"], issue["body"] or ""
+
+
+def fetch_regulations_text(owner: str, name: str, path: str) -> str:
+    data = gh_graphql(
+        """
+        query($owner: String!, $name: String!, $expr: String!) {
+          repository(owner: $owner, name: $name) {
+            object(expression: $expr) {
+              ... on Blob { text }
+            }
+          }
+        }
+        """,
+        owner=owner,
+        name=name,
+        expr=f"HEAD:{path}",
+    )
+    repository = data["repository"]
+    if repository is None:
+        print(f"ERROR: regulations repository '{owner}/{name}' not found or inaccessible", file=sys.stderr)
+        sys.exit(1)
+    obj = repository["object"]
+    if obj is None:
+        print(f"ERROR: '{path}' not found on {owner}/{name}'s default branch", file=sys.stderr)
+        sys.exit(1)
+    return obj["text"]
+
+
+def cmd_propose_context(args: argparse.Namespace) -> None:
+    """Gather everything a model needs to decide a proposal's content.
+
+    Outputs one self-contained prompt: the regulations text, the
+    candidate issue's title/body, and the catalog of fields available to
+    propose, plus an explicit instruction for the JSON response shape
+    `propose --model-response` expects back. Deliberately produces text
+    only -- it does not itself call a model, so it stays agnostic to
+    whichever inference mechanism a caller wires in.
+    """
+    parent = resolve_parent(args.parent_issue_id)
+    owner = parent["repository"]["owner"]["login"]
+    name = parent["repository"]["name"]
+
+    title, body = fetch_issue_title_body(owner, name, parent["number"])
+
+    regulations_owner, regulations_name = args.regulations_repo.split("/")
+    regulations_text = fetch_regulations_text(regulations_owner, regulations_name, args.regulations_path)
+
+    fields = proposal_fields(owner, name, args.prefix)
+    if fields:
+        field_lines = []
+        for field_name, field in fields.items():
+            data_type = field["dataType"]
+            if data_type in ("SINGLE_SELECT", "MULTI_SELECT"):
+                options = ", ".join(o["name"] for o in field["options"])
+                field_lines.append(f'- "{field_name}" ({data_type}, one of: {options})')
+            else:
+                field_lines.append(f'- "{field_name}" ({data_type})')
+        fields_block = "\n".join(field_lines)
+    else:
+        fields_block = "(no custom fields configured)"
+
+    prompt = f"""# Regulations
+
+{regulations_text}
+
+# Issue to propose against ({owner}/{name}#{parent['number']})
+
+## Title
+
+{title}
+
+## Body
+
+{body}
+
+# Available proposal fields
+
+Besides `title` and `body` (always proposable), these custom fields are
+available:
+
+{fields_block}
+
+# Required response format
+
+Respond with a single JSON object and nothing else -- no prose, no
+Markdown code fence. Shape:
+
+{{
+  "title": "<proposed title>",
+  "body": "<proposed body>",
+  "fields": {{
+    "<field name>": "<value>"
+  }}
+}}
+
+Only include a field in "fields" if you have a real value to propose
+for it -- omit it entirely rather than guessing. For a field whose type
+is listed as MULTI_SELECT, its value must be a JSON array of option
+name strings, even if you are only selecting one option. For every
+other type, its value is a single string (write dates as YYYY-MM-DD)."""
+
+    write_output(
+        result="context",
+        prompt=prompt,
+        summary=f"context gathered for {owner}/{name}#{parent['number']} ({len(fields)} custom field(s))",
+    )
+
+
+def cmd_propose(args: argparse.Namespace) -> None:
+    """Create a proposal against args.parent_issue_id.
+
+    Takes the model's decision as a `--model-response` JSON blob
+    (produced from `propose-context`'s prompt by whatever inference
+    mechanism the caller wires in) and does only the mechanical part:
+    create the issue, write the given field values, post the control
+    comment. Does not itself decide content -- that's `propose-context`
+    plus a real model call, not this mode's job.
+    """
+    parent = resolve_parent(args.parent_issue_id)
     owner = parent["repository"]["owner"]["login"]
     name = parent["repository"]["name"]
 
@@ -569,9 +717,20 @@ def cmd_propose(args: argparse.Namespace) -> None:
         print(f"ERROR: Issue Type '{args.type}' does not exist in {owner}/{name}", file=sys.stderr)
         sys.exit(1)
 
+    try:
+        model_response = json.loads(args.model_response)
+    except json.JSONDecodeError as error:
+        print(f"ERROR: --model-response is not valid JSON: {error}", file=sys.stderr)
+        sys.exit(1)
+
+    title = model_response.get("title")
+    if not title:
+        print("ERROR: --model-response must include a non-empty 'title'", file=sys.stderr)
+        sys.exit(1)
+    body = model_response.get("body") or ""
+    model_fields = model_response.get("fields") or {}
+
     fields = proposal_fields(owner, name, args.prefix)
-    title = f"Test proposal for {owner}/{name}#{parent['number']}"
-    body = "Test body (mocked -- see #11 for real Propose agent work)."
 
     create_data = gh_graphql(
         """
@@ -593,8 +752,12 @@ def cmd_propose(args: argparse.Namespace) -> None:
 
     field_inputs = []
     filled = []
-    for field_name, field in fields.items():
-        value, names = mock_value_for(field)
+    for field_name, raw_value in model_fields.items():
+        field = fields.get(field_name)
+        if field is None:
+            print(f"::warning::model proposed unknown field '{field_name}', skipping", file=sys.stderr)
+            continue
+        value, names = model_value_for_field(field, raw_value)
         field_input = build_field_input(field, value, names)
         if field_input is not None:
             field_inputs.append(field_input)
@@ -614,7 +777,7 @@ def cmd_propose(args: argparse.Namespace) -> None:
         issue_id=proposal["id"],
         summary=(
             f"created {owner}/{name}#{proposal['number']} for parent #{parent['number']}; "
-            f"mocked fields={','.join(filled) if filled else '(none)'}; transitioned={transitioned}"
+            f"fields={','.join(filled) if filled else '(none)'}; transitioned={transitioned}"
         ),
     )
 
@@ -961,11 +1124,22 @@ def build_parser() -> argparse.ArgumentParser:
     list_fields.add_argument("--prefix", default=DEFAULT_PREFIX)
     list_fields.set_defaults(func=cmd_list_fields)
 
-    propose = subparsers.add_parser("propose", help="create a proposal against a parent issue (mocked field values)")
+    propose_context = subparsers.add_parser(
+        "propose-context",
+        help="gather regulations/issue/field-catalog into one prompt for a model to decide proposal content",
+    )
+    propose_context.add_argument("--parent-issue-id", required=True)
+    propose_context.add_argument("--regulations-repo", required=True)
+    propose_context.add_argument("--regulations-path", required=True)
+    propose_context.add_argument("--prefix", default=DEFAULT_PREFIX)
+    propose_context.set_defaults(func=cmd_propose_context)
+
+    propose = subparsers.add_parser("propose", help="create a proposal against a parent issue from a model's decided content")
     propose.add_argument("--parent-issue-id", required=True)
     propose.add_argument("--repository-id", default=None)
     propose.add_argument("--prefix", default=DEFAULT_PREFIX)
     propose.add_argument("--type", default=DEFAULT_PROPOSAL_TYPE)
+    propose.add_argument("--model-response", required=True, help='JSON {"title", "body", "fields": {...}} from propose-context + a model call')
     propose.add_argument("--entity-query", default=None, help="resolves the controlling entity's id (#69); optional")
     propose.add_argument("--transition-mutation", default=None, help="moves the controlling entity incoming -> review (#69); optional")
     propose.set_defaults(func=cmd_propose)
