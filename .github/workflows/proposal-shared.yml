@@ -70,9 +70,6 @@ permissions:
   issues: write
   contents: write
   pull-requests: write
-# actions/proposal is pinned to @main below, not a version tag, while v0.9.0
-# is still unreleased -- switch back to @v0.9 (matching this repo's other
-# reusable workflows' pinned-tag pattern) once that tag exists.
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -102,7 +99,7 @@ jobs:
       # the comment 👀 on success.
       - name: Verify control comment
         if: github.event_name == 'issue_comment'
-        uses: rubykatzen/starcast/actions/proposal@main
+        uses: $/actions/proposal
         with:
           mode: check-control-comment
           repository: ${{ github.repository }}
@@ -120,7 +117,7 @@ jobs:
     steps:
       - name: Apply proposal
         id: apply
-        uses: rubykatzen/starcast/actions/proposal@main
+        uses: $/actions/proposal
         with:
           mode: apply
           repository: ${{ github.repository }}
@@ -132,7 +129,7 @@ jobs:
           github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: $/actions/telegram-notify
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -152,7 +149,7 @@ jobs:
     steps:
       - name: Reject proposal
         id: reject
-        uses: rubykatzen/starcast/actions/proposal@main
+        uses: $/actions/proposal
         with:
           mode: reject
           repository: ${{ github.repository }}
@@ -160,7 +157,7 @@ jobs:
           github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: $/actions/telegram-notify
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -185,7 +182,7 @@ jobs:
         run: 'echo "::notice::distill is not implemented yet (see #11, #13)"'
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: $/actions/telegram-notify
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -209,7 +206,7 @@ jobs:
         run: 'echo "::notice::rework is not implemented yet (see #11)"'
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: $/actions/telegram-notify
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
@@ -228,7 +225,7 @@ jobs:
     steps:
       - name: Dequeue next proposal candidate
         id: dequeue
-        uses: rubykatzen/starcast/actions/proposal@main
+        uses: $/actions/proposal
         with:
           mode: dequeue
           capacity_query: ${{ inputs.capacity_query }}
@@ -239,7 +236,7 @@ jobs:
       - name: Create proposal
         id: propose
         if: steps.dequeue.outputs.result == 'dequeued'
-        uses: rubykatzen/starcast/actions/proposal@main
+        uses: $/actions/proposal
         with:
           mode: propose
           parent_issue_id: ${{ steps.dequeue.outputs.issue_id }}
@@ -250,7 +247,7 @@ jobs:
           github_token: ${{ secrets.token }}
       - name: Report to Telegram
         if: always()
-        uses: rubykatzen/starcast/actions/telegram-notify@v0.6
+        uses: $/actions/telegram-notify
         with:
           chat_id: ${{ inputs.telegram_chat_id }}
           bot_token: ${{ secrets.telegram_bot_token }}
