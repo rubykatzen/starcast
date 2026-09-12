@@ -27,8 +27,6 @@ commit SHA. Do not recommend `@main` for stable consumers.
 
 ## Workflow behavior
 
-- `route-issue-shared.yml` transfers an issue according to an explicit label
-  routing map.
 - `collect-issues-shared.yml` expands configured organizations to repositories,
   combines them with explicit repositories, and processes each unique
   repository independently. It paginates open issues directly and does not use

@@ -71,6 +71,15 @@
   `issue_number`/`comment_id` to `type: string`, whose unset default is
   genuinely empty.
 
+### Removed
+
+- `route-issue-shared.yml` reusable workflow and its `actions/route-issue`
+  composite action: label-based issue transfer had no proposal or review
+  step, so it never fit the human-agent loop this repo builds for, and its
+  only consumer (`dupmachine/ground-control`) vendored the logic locally
+  instead of depending on it. Breaking for any other consumer still pinned
+  to it (#110).
+
 ## [v0.8.0] - 2026-08-05
 
 ### Added

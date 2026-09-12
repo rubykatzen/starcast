@@ -71,8 +71,8 @@ permissions:
   contents: write
   pull-requests: write
 # actions/proposal is pinned to @main below, not a version tag, while v0.9.0
-# is still unreleased -- switch back to @v0.9 (matching route-issue-shared.yml's
-# own pinned-tag pattern for its sibling action) once that tag exists.
+# is still unreleased -- switch back to @v0.9 (matching this repo's other
+# reusable workflows' pinned-tag pattern) once that tag exists.
 jobs:
   validate:
     runs-on: ubuntu-latest

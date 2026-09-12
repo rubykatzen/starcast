@@ -44,7 +44,7 @@ editorial pipeline implementation has been removed and is not supported. Its
 history remains available in Git.
 
 The current reusable workflows cover centralized Project intake for issues and
-pull requests, plus explicit label-based issue routing. The proposal-as-issue
+pull requests. The proposal-as-issue
 lifecycle described above (`Propose`/`Apply`/`Reject`/`Distill`/`Rework`) has a
 working contract, `proposal-shared.yml`: `Apply`/`Reject` are fully
 implemented, `Propose` dequeues and creates a proposal with mocked field
@@ -52,46 +52,6 @@ values (real agent judgment not wired in yet), and `Distill`/`Rework` remain
 placeholders (tracked in #11).
 
 ## Reusable workflows
-
-### `route-issue-shared.yml`
-
-Transfers an issue to another repository when a configured label is
-applied, idempotently.
-
-```yaml
-jobs:
-  route:
-    uses: rubykatzen/starcast/.github/workflows/route-issue-shared.yml@v0.9
-    with:
-      routes: >-
-        {
-          "Household": "some-org/some-repo",
-          "Meds": "another-org/another-repo"
-        }
-      label_name: ${{ github.event.label.name }}
-      issue_number: ${{ github.event.issue.number }}
-      create_labels_if_missing: false
-    secrets:
-      token: ${{ secrets.ROUTE_TOKEN }}
-```
-
-Caller triggers on `issues: labeled`.
-
-- **Exact match only**: `routes` maps exact label names to `owner/repo`.
-  A label with no configured route is a clean no-op, not an error —
-  StarCast never derives a destination from untrusted label text.
-- **Idempotent, verified against real transfers**: after a transfer, the
-  issue's old id and its `owner/repo#number` address both stop resolving
-  on the source side. A retry that can't find the issue there anymore is
-  treated as an already-completed transfer, not an error.
-- **Source equal to destination** is a clean no-op.
-- **Label carry-over** is off by default (`create_labels_if_missing:
-  false`) — GitHub's own transfer behavior otherwise silently drops a
-  label with no same-named counterpart at the destination, which is
-  usually what you want for a routing label. Set it to `true` to have
-  GitHub create the label at the destination instead.
-- `token` needs write access to both the source and destination
-  repositories; StarCast stores no consumer secrets.
 
 ### `collect-issues-shared.yml`
 
