@@ -58,6 +58,15 @@
   `workflow_dispatch` runs.
 - `issue_number`/`comment_id` inputs on `proposal-shared.yml` change from
   `type: number` to `type: string`.
+- `collect-issues-shared.yml`, `collect-pull-requests-shared.yml`, and
+  `proposal-shared.yml` reference their sibling `actions/*` composite
+  actions via `$/actions/...` instead of a version-pinned
+  `rubykatzen/starcast/actions/...@vX`, matching the pattern
+  `rubykatzen/baseline`'s own shared workflows use. `$/` resolves to this
+  repository at the same ref the caller pinned for the shared workflow
+  itself, so these internal references track releases automatically and
+  no longer need a separate version bump (and can't drift out of sync
+  with it) every time one is cut.
 
 ### Fixed
 
