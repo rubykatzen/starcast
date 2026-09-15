@@ -44,7 +44,8 @@ commit SHA. Do not recommend `@main` for stable consumers.
   enforces that `issue_comment` runs carry `issue_number`/`comment_id` and
   that `schedule`/`workflow_dispatch` runs do not, and that
   `schedule`/`workflow_dispatch` runs carry `capacity_query`/`queue_query`/
-  `review_limit`. On `issue_comment` runs, `validate` also verifies the
+  `review_limit`/the `model_credentials` secret. On `issue_comment` runs,
+  `validate` also verifies the
   triggering comment is actually the proposal's first/control comment
   (#63) via `mode: check-control-comment`, shared here rather than
   duplicated across `apply`/`reject`/`distill`/`rework` since all four
@@ -93,12 +94,22 @@ commit SHA. Do not recommend `@main` for stable consumers.
       starts with `prefix`, stripped, plus the always-available fixed set
       (`title`, `body`, `type`, `parent`, `labels`) — the menu a caller
       (in the future, an agent) picks from.
+    - `propose-context` gathers everything a model needs to decide a
+      proposal's content -- regulations text (fetched from
+      `regulations_repo`/`regulations_path`'s default branch via
+      `repository.object(expression: "HEAD:<path>")`), the candidate
+      issue's title/body, and the field catalog from `proposal_fields` --
+      into one self-contained prompt, output as `prompt`. Produces text
+      only; agnostic to whichever inference mechanism a caller wires in.
     - `propose` creates a proposal issue against a parent: resolves the
-      Issue Type, creates the sub-issue, fills every discovered custom
-      field with a trivial type-appropriate mock value (`propose` does
-      not read regulations or call a model yet — real agent judgment is
-      tracked in #11), and posts the control comment
-      (`CONTROL_COMMENT_BODY`) as the first comment.
+      Issue Type, creates the sub-issue, writes whichever fields
+      `--model-response` (a JSON blob shaped `{"title", "body",
+      "fields": {...}}`, produced from `propose-context`'s prompt by a
+      real model call) included, and posts the control comment
+      (`CONTROL_COMMENT_BODY`) as the first comment. Does not decide
+      content itself -- an unknown field name in the response is a
+      warning and a skip, not an error, since the model's output isn't
+      trusted to match the catalog exactly.
     - `propose`/`apply` optionally transition whatever "controlling
       entity" tracks an issue's state (e.g. a `ProjectV2Item`) as it
       moves through the lifecycle (#69): `entity_query` resolves the

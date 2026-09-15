@@ -14,7 +14,16 @@ inputs:
     description: 'Id of the comment to verify is the proposal''s first/control comment (check-control-comment; see #63)'
     required: false
   parent_issue_id:
-    description: 'GraphQL node id of the issue to propose against (propose)'
+    description: 'GraphQL node id of the issue to propose against (propose, propose-context)'
+    required: false
+  regulations_repo:
+    description: '"owner/repo" that owns the regulations document (propose-context)'
+    required: false
+  regulations_path:
+    description: 'Path to the regulations document inside regulations_repo, read from its default branch (propose-context)'
+    required: false
+  model_response:
+    description: 'JSON {"title", "body", "fields": {...}} decided by a model from propose-context''s prompt (propose)'
     required: false
   capacity_query:
     description: 'GraphQL query text; must alias exactly one scalar numeric field as `capacity` (dequeue)'
@@ -55,6 +64,9 @@ outputs:
   fields:
     description: 'JSON field catalog (list-fields only)'
     value: ${{ steps.run.outputs.fields }}
+  prompt:
+    description: 'Self-contained prompt for a model to decide proposal content (propose-context only)'
+    value: ${{ steps.run.outputs.prompt }}
   summary:
     description: 'Human-readable summary of the outcome'
     value: ${{ steps.run.outputs.summary }}
@@ -70,6 +82,9 @@ runs:
         ISSUE_NUMBER: ${{ inputs.issue_number }}
         COMMENT_ID: ${{ inputs.comment_id }}
         PARENT_ISSUE_ID: ${{ inputs.parent_issue_id }}
+        REGULATIONS_REPO: ${{ inputs.regulations_repo }}
+        REGULATIONS_PATH: ${{ inputs.regulations_path }}
+        MODEL_RESPONSE: ${{ inputs.model_response }}
         CAPACITY_QUERY: ${{ inputs.capacity_query }}
         QUEUE_QUERY: ${{ inputs.queue_query }}
         REVIEW_LIMIT: ${{ inputs.review_limit }}
@@ -87,8 +102,11 @@ runs:
           list-fields)
             args+=(--repository "$REPOSITORY" --prefix "$PREFIX")
             ;;
+          propose-context)
+            args+=(--parent-issue-id "$PARENT_ISSUE_ID" --regulations-repo "$REGULATIONS_REPO" --regulations-path "$REGULATIONS_PATH" --prefix "$PREFIX")
+            ;;
           propose)
-            args+=(--parent-issue-id "$PARENT_ISSUE_ID" --prefix "$PREFIX" --type "$PROPOSAL_TYPE_NAME" --entity-query "$ENTITY_QUERY" --transition-mutation "$PROPOSE_TRANSITION_MUTATION")
+            args+=(--parent-issue-id "$PARENT_ISSUE_ID" --prefix "$PREFIX" --type "$PROPOSAL_TYPE_NAME" --model-response "$MODEL_RESPONSE" --entity-query "$ENTITY_QUERY" --transition-mutation "$PROPOSE_TRANSITION_MUTATION")
             ;;
           apply)
             args+=(--repository "$REPOSITORY" --issue-number "$ISSUE_NUMBER" --prefix "$PREFIX" --type "$PROPOSAL_TYPE_NAME" --entity-query "$ENTITY_QUERY" --transition-mutation "$APPLY_TRANSITION_MUTATION")

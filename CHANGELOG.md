@@ -22,15 +22,25 @@
     `content { ... on Issue { id } }`).
   - `list-fields`: discovers the prefixed proposal Issue Fields available
     in a repository.
+  - `propose-context`: gathers regulations text, the candidate issue's
+    title/body, and the field catalog into one self-contained prompt for
+    a model to decide proposal content from — output only, agnostic to
+    whichever inference mechanism a caller wires in.
   - `propose`: creates a proposal issue against a parent — Issue Type,
-    sub-issue relationship, field values, and the control comment. Field
-    *values* are mocked (a trivial type-appropriate placeholder) rather
-    than agent-decided; real regulation-constrained judgment is tracked
-    in #11.
+    sub-issue relationship, field values, and the control comment. Takes
+    the content to write as a `--model-response` JSON blob
+    (`{"title", "body", "fields": {...}}`) rather than deciding it
+    itself; an unknown field name in the response is a warning and a
+    skip, not an error.
   - `apply`/`reject`: unchanged behavior from the actions they replace
     (below), now reached via `mode: apply`/`mode: reject`.
-- `proposal-shared.yml`'s `propose` job now dequeues a candidate and
-  creates a (mocked) proposal for it, instead of a placeholder notice.
+- `proposal-shared.yml`'s `propose` job now dequeues a candidate, asks a
+  model (via `actions/ai-inference` wrapping GitHub Copilot CLI,
+  requiring a `model_credentials` secret backed by a PAT with an active
+  Copilot seat) what to propose, and creates the proposal from its
+  response — instead of a placeholder notice. `validate` hard-errors on
+  schedule/`workflow_dispatch` runs missing `model_credentials`, the
+  same way it already does for `capacity_query`/`queue_query`.
 - `entity_query`, `propose_transition_mutation`, and
   `apply_transition_mutation` inputs on `proposal-shared.yml`: optionally
   transition whatever "controlling entity" tracks an issue's state (e.g.

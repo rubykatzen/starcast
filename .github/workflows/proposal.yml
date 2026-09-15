@@ -18,7 +18,8 @@ jobs:
   # secrets.GITHUB_TOKEN cannot mutate Projects V2 (no such permission
   # scope exists for the auto-provisioned token) -- this caller needs a
   # real PAT with organization Projects read/write, stored as
-  # PROJECTS_TOKEN.
+  # PROJECTS_TOKEN. Propose's model call needs a separate PAT with an
+  # active GitHub Copilot seat, stored as COPILOT_PAT.
   handle:
     uses: ./.github/workflows/proposal-shared.yml
     with:
@@ -39,3 +40,4 @@ jobs:
         mutation($entityId: ID!) { updateProjectV2ItemFieldValue(input: {projectId: "PVT_kwDOD5LpBM4Bfjz_", itemId: $entityId, fieldId: "PVTSSF_lADOD5LpBM4Bfjz_zhZ13FI", value: {singleSelectOptionId: "98236657"}}) { clientMutationId } }
     secrets:
       token: ${{ secrets.PROJECTS_TOKEN }}
+      model_credentials: ${{ secrets.COPILOT_PAT }}
