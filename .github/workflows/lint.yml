@@ -5,4 +5,4 @@ on:
   pull_request:
 jobs:
   lint:
-    uses: rubykatzen/baseline/.github/workflows/lint-shared.yml@v0.18.1
+    uses: rubykatzen/baseline/.github/workflows/lint-shared.yml@v0.18.2
