@@ -91,6 +91,10 @@ jobs:
               echo "::error::schedule/workflow_dispatch-triggered runs must receive capacity_query, queue_query, and review_limit"
               exit 1
             fi
+            if [ -z "${{ secrets.model_credentials }}" ]; then
+              echo "::error::schedule/workflow_dispatch-triggered runs must receive the model_credentials secret -- Propose calls a model to decide field values, it no longer mocks them"
+              exit 1
+            fi
           fi
       # Verifies the triggering comment is the proposal's actual first/
       # control comment, not just any comment containing matching checkbox
@@ -232,7 +236,33 @@ jobs:
           queue_query: ${{ inputs.queue_query }}
           review_limit: ${{ inputs.review_limit }}
           github_token: ${{ secrets.token }}
-      # Field values are mocked, not agent-decided yet — tracked in #11.
+      - name: Gather proposal context
+        id: context
+        if: steps.dequeue.outputs.result == 'dequeued'
+        uses: rubykatzen/starcast/actions/proposal@main
+        with:
+          mode: propose-context
+          parent_issue_id: ${{ steps.dequeue.outputs.issue_id }}
+          regulations_repo: ${{ inputs.regulations_repo }}
+          regulations_path: ${{ inputs.regulations_path }}
+          prefix: ${{ inputs.prefix }}
+          github_token: ${{ secrets.token }}
+      - name: Set up Node.js
+        if: steps.dequeue.outputs.result == 'dequeued'
+        uses: actions/setup-node@v4
+      - name: Install Copilot CLI
+        if: steps.dequeue.outputs.result == 'dequeued'
+        run: npm install -g @github/copilot
+      - name: Decide proposal content
+        id: inference
+        if: steps.dequeue.outputs.result == 'dequeued'
+        uses: actions/ai-inference@v1
+        with:
+          prompt: ${{ steps.context.outputs.prompt }}
+          system-prompt: 'You propose structured field values for a GitHub Issue, constrained by consumer-owned regulations text. Respond with exactly one JSON object and nothing else -- no prose, no Markdown code fence.'
+          model: claude-sonnet-4.5
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.model_credentials }}
       - name: Create proposal
         id: propose
         if: steps.dequeue.outputs.result == 'dequeued'
@@ -242,6 +272,7 @@ jobs:
           parent_issue_id: ${{ steps.dequeue.outputs.issue_id }}
           prefix: ${{ inputs.prefix }}
           proposal_type_name: ${{ inputs.proposal_type_name }}
+          model_response: ${{ steps.inference.outputs.response }}
           entity_query: ${{ inputs.entity_query }}
           propose_transition_mutation: ${{ inputs.propose_transition_mutation }}
           github_token: ${{ secrets.token }}

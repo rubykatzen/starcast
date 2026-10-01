@@ -46,10 +46,9 @@ history remains available in Git.
 The current reusable workflows cover centralized Project intake for issues and
 pull requests. The proposal-as-issue
 lifecycle described above (`Propose`/`Apply`/`Reject`/`Distill`/`Rework`) has a
-working contract, `proposal-shared.yml`: `Apply`/`Reject` are fully
-implemented, `Propose` dequeues and creates a proposal with mocked field
-values (real agent judgment not wired in yet), and `Distill`/`Rework` remain
-placeholders (tracked in #11).
+working contract, `proposal-shared.yml`: `Apply`/`Reject`/`Propose` are fully
+implemented (`Propose` decides field values via a real model call, not a
+mock), and `Distill`/`Rework` remain placeholders (tracked in #86/#87).
 
 ## Reusable workflows
 
@@ -183,21 +182,32 @@ jobs:
   empty/unset proposal field (title/body included) leaves the parent's field
   untouched. `Reject` just closes the proposal. Both are idempotent:
   re-running against an already-closed proposal is a no-op.
-- **`Propose` dequeues and creates, with mocked content** (#55, #11) — on
-  each scheduled run it runs the consumer-supplied `capacity_query`, and if
-  the result is below `review_limit`, runs `queue_query` and takes its first
+- **`Propose` dequeues, asks a model, and creates** (#55, #11) — on each
+  scheduled run it runs the consumer-supplied `capacity_query`, and if the
+  result is below `review_limit`, runs `queue_query` and takes its first
   candidate; at capacity or an empty queue are both clean no-ops. Both
   queries are consumer-owned GraphQL text: `capacity_query` must alias
   exactly one scalar numeric field as `capacity`, `queue_query` exactly one
   array-valued field as `queue` (each element at least `{ id }`), found by a
   recursive walk matching alias name and value type — zero or more than one
   match is a hard configuration error. Only one candidate is ever dequeued
-  per run, so no pagination/cursor state is needed between runs. When a
-  candidate is found, `Propose` creates the proposal issue against it —
-  Issue Type, sub-issue relationship, the control comment — but **fills every
-  field with a trivial mock value rather than a real agent decision**; wiring
-  in regulation-constrained judgment is tracked in #11. `Distill`/`Rework`
-  remain placeholders.
+  per run, so no pagination/cursor state is needed between runs.
+
+  Deciding what to propose and creating the proposal are two separate
+  steps, split the same way `Apply`/`Reject` are deterministic and
+  `Distill`/`Rework` are agent work: `propose-context` gathers the
+  regulations text, the candidate's title/body, and the catalog of
+  available fields into one self-contained prompt (schema-agnostic about
+  which inference mechanism reads it); the caller hands that prompt to a
+  model and gets back one JSON object (`{"title", "body", "fields": {...}}`);
+  `propose` takes that JSON as `--model-response` and does only the
+  mechanical part — Issue Type, sub-issue relationship, field writes, the
+  control comment. The dogfood caller (`.github/workflows/proposal.yml`)
+  wires this to GitHub Copilot CLI via `actions/ai-inference`, requiring a
+  PAT with an active Copilot seat (`model_credentials`/`COPILOT_PAT`) —
+  `validate` hard-errors on schedule/`workflow_dispatch` runs if it's
+  missing, the same way it does for `capacity_query`/`queue_query`.
+  `Distill`/`Rework` remain placeholders.
 - **The control comment has one fixed template**, posted by `Propose`
   immediately after creation: `- [ ] Apply`, `- [ ] Reject`,
   `- [ ] Distill`, `- [ ] Rework`, nothing else. Before `Apply`/`Reject`/
